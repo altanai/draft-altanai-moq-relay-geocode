@@ -1,0 +1,533 @@
+
+
+
+
+moq                                                             A. Bisht
+Internet-Draft                                              Cisco Meraki
+Intended status: Standards Track                                T. Evens
+Expires: 10 September 2026                                         Cisco
+                                                            9 March 2026
+
+
+             Geographic Location for Media over QUIC Relays
+                   draft-altanai-moq-relay-geocode-00
+
+Abstract
+
+   This document defines a mechanism for Media over QUIC (MoQ) relays to
+   advertise their geographic location (geocode) and related path
+   metrics.  Some clients require their media data to remain locally or
+   geo-fenced within specific jurisdictions for privacy and security
+   compliance (e.g., GDPR, HIPAA, or sector-specific regulations).  This
+   mechanism enables service providers to track the geographic path of
+   media packets through the relay mesh and to enforce geo-fencing
+   policies.  It supports Geo-Distributed Orchestration and Routing
+   (GDOR), data residency compliance, latency optimization, and relay
+   selection.  The specification includes optional IATA airport codes as
+   human-readable geographic identifiers for major relay locations.
+
+About This Document
+
+   This note is to be removed before publishing as an RFC.
+
+   The latest revision of this draft can be found at
+   https://datatracker.ietf.org/doc/draft-altanai-moq-relay-geocode/.
+   Status information for this document may be found at
+   https://datatracker.ietf.org/doc/draft-altanai-moq-relay-geocode/.
+
+   Discussion of this document takes place on the moq Working Group
+   mailing list (mailto:moq@ietf.org), which is archived at
+   https://mailarchive.ietf.org/arch/browse/moq/.  Subscribe at
+   https://www.ietf.org/mailman/listinfo/moq/.
+
+   Source for this draft and an issue tracker can be found at
+   https://github.com/altanai/moq-relay-geocode.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 10 September 2026.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents (https://trustee.ietf.org/
+   license-info) in effect on the date of publication of this document.
+   Please review these documents carefully, as they describe your rights
+   and restrictions with respect to this document.  Code Components
+   extracted from this document must include Revised BSD License text as
+   described in Section 4.e of the Trust Legal Provisions and are
+   provided without warranty as described in the Revised BSD License.
+
+Table of Contents
+
+   1.  Introduction
+     1.1.  Design Goals
+   2.  Conventions and Definitions
+   3.  Use Cases
+     3.1.  Relay Selection by Proximity
+     3.2.  Geo-Distributed Orchestration (GDOR)
+     3.3.  Path and Vicinity Awareness
+     3.4.  Metrics Integration
+   4.  Geocode Representation
+     4.1.  Primary Format: WGS84 Coordinates
+     4.2.  Optional: IATA Code
+     4.3.  Optional: Region and Jurisdiction
+   5.  Relay Advertisement Format
+     5.1.  JSON Schema
+     5.2.  Example Advertisement
+     5.3.  Integration with MoQ
+   6.  Vicinity and Path Computation
+     6.1.  Great-Circle Distance
+     6.2.  Path Metrics
+     6.3.  Vicinity Semantics
+   7.  Security Considerations
+     7.1.  Privacy
+     7.2.  Integrity
+     7.3.  Misuse
+   8.  IANA Considerations
+   9.  References
+     9.1.  Normative References
+     9.2.  Informative References
+   Appendix A.  Appendix A.  Example Topology (Informative)
+   Appendix B.  Appendix B.  IATA Code Reference (Informative)
+   Acknowledgments
+   Authors' Addresses
+
+1.  Introduction
+
+   Media over QUIC Transport (MOQT) [MoQTransport] uses a relay-based
+   architecture where publishers push media to relays and subscribers
+   pull from relays.  Relays can be chained for CDN-like distribution,
+   forming a mesh of interconnected nodes.  In such topologies—as
+   illustrated by deployments with multiple relays (e.g., relays A, B,
+   C, D) connecting Home/Enterprise clients to a Service Media
+   backend—the following questions arise:
+
+   *  *Where* is each relay located geographically?
+
+   *  *How close* are relays to each other and to clients?
+
+   *  *Which path* through the relay mesh minimizes latency or satisfies
+      policy?
+
+   Today, MoQ provides no standard way for relays to advertise
+   geographic position.  Clients and orchestration systems rely on
+   external mechanisms (e.g., IP geolocation, manual configuration) that
+   are often imprecise, inconsistent, or unavailable.  This document
+   specifies a lightweight, protocol-aligned mechanism for relays to
+   advertise geocode and related metrics, enabling:
+
+   1.  *Vicinity and path computation*: Determining physical proximity
+       and logical paths between relays.
+
+   2.  *GDOR (Geo-Distributed Orchestration/Routing)*: Making routing
+       and placement decisions based on geography (e.g., route through
+       EU relays for GDPR, avoid certain jurisdictions).
+
+   3.  *Latency optimization*: Selecting relays with lower RTT or
+       propagation time (PT) to the client or to upstream relays.
+
+   4.  *Data residency and compliance*: Ensuring media flows stay within
+       required geographic boundaries.  Clients often require their data
+       to be locally or geo-fenced for privacy and security compliance
+       (e.g., GDPR, HIPAA).
+
+   5.  *Path tracking*: Enabling service providers to track the
+       geographic path of media packets through the relay mesh for
+       compliance audits and geo-fencing enforcement.
+
+1.1.  Design Goals
+
+   *  *Minimal protocol impact*: Reuse existing MoQ catalog, metrics, or
+      discovery mechanisms where possible.
+
+   *  *Interoperability*: Use standard geographic representations
+      (WGS84, GeoJSON) and widely recognized identifiers (IATA codes).
+
+   *  *Extensibility*: Allow optional altitude, region codes, and path
+      metrics (RTT, PT) without mandating them.
+
+2.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in
+   BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+   *Geocode*: A representation of geographic position, typically
+   latitude and longitude (WGS84), optionally with altitude.
+
+   *Relay Vicinity*: The geographic proximity of one relay to another or
+   to a client, expressed as distance or as a qualitative relationship
+   (e.g., same region, same metro).
+
+   *Relay Path*: A sequence of relays through which media flows from
+   publisher to subscriber, or the logical/geographic route between
+   relays.
+
+   *GDOR (Geo-Distributed Orchestration/Routing)*: Routing and
+   orchestration decisions that consider geographic location, including
+   data residency, latency optimization, and jurisdictional compliance.
+
+   *IATA Code*: A three-letter code assigned by the International Air
+   Transport Association to identify airports and major metropolitan
+   areas (e.g., JFK, LHR, FRA).  Used here as an optional human-readable
+   geographic identifier for relay locations.
+
+3.  Use Cases
+
+3.1.  Relay Selection by Proximity
+
+   A subscriber in New York (NY) may have multiple relays available
+   (e.g., A, B, C, D).  With geocode and RTT/PT metrics, the client or
+   an orchestration layer can select the relay that minimizes latency or
+   satisfies geographic constraints.
+
+3.2.  Geo-Distributed Orchestration (GDOR)
+
+   Some clients require their media data to remain locally or geo-fenced
+   within specific jurisdictions for privacy and security compliance
+   (e.g., GDPR, HIPAA, or sector-specific regulations).  An operator may
+   require that:
+
+   *  EU subscriber traffic flows only through EU relays.
+
+   *  Media for a given jurisdiction is processed within that
+      jurisdiction.
+
+   *  Path selection avoids certain regions for policy or cost reasons.
+
+   Geocode enables GDOR by allowing relays to advertise their
+   jurisdiction (e.g., via country/region codes) and by allowing path
+   computation to respect geographic boundaries.  Service providers can
+   use relay geocode and the advertised neighbor topology to *track the
+   geographic path* of media packets as they traverse the MoQ relay
+   mesh, supporting compliance audits and geo-fencing enforcement.
+
+3.3.  Path and Vicinity Awareness
+
+   In a relay mesh (e.g., A↔B↔C↔D), knowing the geocode of each relay
+   allows:
+
+   *  *Vicinity*: Computing great-circle distance or approximate
+      propagation delay between relays.
+
+   *  *Path*: Understanding the geographic route (e.g., NY → Relay D →
+      Relay A → SVC) and optimizing it.
+
+3.4.  Metrics Integration
+
+   Deployments commonly measure *RTT to Relay* and *PT (Propagation
+   Time) to Relay* as key metrics.  Geocode complements these by
+   providing a stable, policy-relevant attribute (location) that does
+   not change with network conditions, while RTT/PT provide dynamic
+   performance signals.
+
+4.  Geocode Representation
+
+4.1.  Primary Format: WGS84 Coordinates
+
+   Relay geocode MUST be representable as WGS84 coordinates (as used in
+   GeoJSON [RFC7946]):
+
+   *  *latitude*: Decimal degrees, -90 to 90.
+
+   *  *longitude*: Decimal degrees, -180 to 180.
+
+   *  *altitude* (optional): Meters above WGS84 ellipsoid.
+
+   Example (JSON):
+
+   json { "latitude": 40.6413, "longitude": -73.7781, "altitude": 4 }
+
+4.2.  Optional: IATA Code
+
+   An IATA airport code MAY be included as a human-readable geographic
+   identifier.  IATA codes are widely used for airports and major metro
+   areas and provide a compact, recognizable reference (e.g., JFK for
+   New York, LHR for London).
+
+   *Suggested IATA codes for common relay regions* (informative):
+
+   +======================+================+===========================+
+   | Region / Metro       | Suggested IATA | Notes                     |
+   +======================+================+===========================+
+   | New York (NYC metro) | JFK, LGA, EWR  | Primary: JFK              |
+   |                      |                | for NYC area              |
+   +----------------------+----------------+---------------------------+
+   | Virginia (DC metro)  | IAD, DCA       | IAD for                   |
+   |                      |                | Ashburn/DC area           |
+   +----------------------+----------------+---------------------------+
+   | London               | LHR, LGW       | LHR for London            |
+   +----------------------+----------------+---------------------------+
+   | Frankfurt            | FRA            | Major EU hub              |
+   +----------------------+----------------+---------------------------+
+   | Paris                | CDG            | Major EU hub              |
+   +----------------------+----------------+---------------------------+
+   | Amsterdam            | AMS            | Major EU hub              |
+   +----------------------+----------------+---------------------------+
+   | Tokyo                | NRT, HND       | NRT for Tokyo             |
+   |                      |                | area                      |
+   +----------------------+----------------+---------------------------+
+   | Singapore            | SIN            | Asia-Pacific              |
+   +----------------------+----------------+---------------------------+
+   | Sydney               | SYD            | Australia                 |
+   +----------------------+----------------+---------------------------+
+   | São Paulo            | GRU            | South America             |
+   +----------------------+----------------+---------------------------+
+
+                                  Table 1
+
+   The IATA code SHOULD correspond to the nearest major airport or metro
+   area where the relay is located.  It is advisory only; precise
+   routing MUST use latitude/longitude when geographic accuracy is
+   required.
+
+4.3.  Optional: Region and Jurisdiction
+
+   For GDOR and compliance, relays MAY advertise:
+
+   *  *country*: ISO 3166-1 alpha-2 (e.g., "US", "DE").
+
+   *  *subdivision*: ISO 3166-2 (e.g., "US-NY", "DE-BY") as in
+      [RFC9388].
+
+5.  Relay Advertisement Format
+
+5.1.  JSON Schema
+
+   The following JSON structure defines the relay geocode advertisement.
+   It MAY be carried in MoQ catalog extensions, metrics ([MoQMetrics]),
+   or a dedicated discovery resource (e.g., well-known URI).
+
+   json { "$schema": "http://json-schema.org/draft-07/schema#", "title":
+   "MoQ Relay Geocode", "type": "object", "required": ["relay_id",
+   "latitude", "longitude"], "properties": { "relay_id": { "type":
+   "string", "description": "Unique relay identifier" }, "latitude": {
+   "type": "number", "minimum": -90, "maximum": 90 }, "longitude": {
+   "type": "number", "minimum": -180, "maximum": 180 }, "altitude": {
+   "type": "number", "description": "Meters above WGS84 ellipsoid" },
+   "iata_code": { "type": "string", "pattern": "^[A-Z]{3}$",
+   "description": "IATA airport/metro code" }, "country": { "type":
+   "string", "pattern": "^[A-Z]{2}$", "description": "ISO 3166-1 alpha-
+   2" }, "subdivision": { "type": "string", "description": "ISO 3166-2
+   subdivision" }, "rtt_ms": { "type": "number", "description": "RTT to
+   this relay (ms), if advertised" }, "pt_ms": { "type": "number",
+   "description": "Propagation time to relay (ms), if advertised" },
+   "neighbors": { "type": "array", "items": { "type": "object",
+   "properties": { "relay_id": { "type": "string" }, "rtt_ms": { "type":
+   "number" }, "pt_ms": { "type": "number" } } }, "description":
+   "Adjacent relays and inter-relay metrics" } } }
+
+5.2.  Example Advertisement
+
+   Relay D in New York area, with path metrics:
+
+   json { "relay_id": "relay-D", "latitude": 40.6413, "longitude":
+   -73.7781, "altitude": 4, "iata_code": "JFK", "country": "US",
+   "subdivision": "US-NY", "rtt_ms": 16, "pt_ms": 12, "neighbors": [ {
+   "relay_id": "relay-A", "rtt_ms": 7, "pt_ms": 3 }, { "relay_id":
+   "relay-C", "rtt_ms": 12, "pt_ms": 5 } ] }
+
+5.3.  Integration with MoQ
+
+   *  *Catalog*: A relay MAY include geocode in catalog metadata for
+      namespaces or tracks it serves.
+
+   *  *Metrics*: Geocode MAY be part of metrics exposed per [MoQMetrics]
+      for relay selection and monitoring.
+
+   *  *Discovery*: A relay MAY serve geocode at a well-known path (e.g.,
+      /.well-known/moq-relay-geocode) or via a Setup Option in SETUP.
+
+   The exact wire format and negotiation are left to a companion
+   specification or a future revision of the MoQ transport or metrics
+   documents.
+
+6.  Vicinity and Path Computation
+
+6.1.  Great-Circle Distance
+
+   Given two relays with geocode (lat1, lon1) and (lat2, lon2), the
+   approximate great-circle distance in kilometers can be computed using
+   the Haversine formula or an equivalent.  This provides a stable
+   measure of physical proximity independent of network topology.
+
+6.2.  Path Metrics
+
+   When relays advertise neighbors with rtt_ms and pt_ms, a client or
+   orchestration system can:
+
+   1.  *Build a relay graph*: Nodes = relays, edges = neighbor
+       relationships with RTT/PT.
+
+   2.  *Compute paths*: Shortest path by RTT, by PT, or by geographic
+       distance.
+
+   3.  *Apply GDOR constraints*: Filter paths to those that stay within
+       required jurisdictions (using country, subdivision).
+
+6.3.  Vicinity Semantics
+
+   *  *Same metro*: Relays with the same iata_code or within ~50 km.
+
+   *  *Same region*: Relays with the same subdivision or country.
+
+   *  *Cross-border*: Path crosses country boundaries; may trigger
+      compliance checks.
+
+7.  Security Considerations
+
+7.1.  Privacy
+
+   *  Geocode reveals relay location.  Operators who wish to hide exact
+      location MAY advertise only country and subdivision, or a coarse-
+      grained geocode (e.g., rounded to 0.1°).
+
+   *  IATA codes are less precise than coordinates and may be preferred
+      when exact location must not be disclosed.
+
+7.2.  Integrity
+
+   *  Geocode advertisements SHOULD be integrity-protected (e.g., over
+      TLS as with MoQ) and, when used for compliance, SHOULD be
+      verifiable (e.g., signed by a trusted authority).
+
+7.3.  Misuse
+
+   *  Adversaries could advertise false geocode to attract traffic or
+      evade geographic restrictions.  Relays SHOULD be authenticated;
+      geocode from untrusted sources SHOULD be validated or ignored.
+
+8.  IANA Considerations
+
+   This document does not require IANA actions.  If a well-known URI or
+   a MoQ parameter type is registered in the future, the appropriate
+   IANA registry would be updated.
+
+9.  References
+
+9.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://www.rfc-editor.org/rfc/rfc2119>.
+
+   [RFC7946]  Butler, H., Daly, M., Doyle, A., Gillies, S., Hagen, S.,
+              and T. Schaub, "The GeoJSON Format", August 2016.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
+              May 2017, <https://www.rfc-editor.org/rfc/rfc8174>.
+
+9.2.  Informative References
+
+   [MoQMetrics]
+              Jennings, C., "Metrics over MOQT", Work in Progress,
+              Internet-Draft, draft-jennings-moq-metrics-02, 2025,
+              <https://datatracker.ietf.org/doc/draft-jennings-moq-
+              metrics/>.
+
+   [MoQTransport]
+              IETF MOQ WG, "Media over QUIC Transport", Work in
+              Progress, Internet-Draft, draft-ietf-moq-transport-17,
+              2026, <https://datatracker.ietf.org/doc/draft-ietf-moq-
+              transport/>.
+
+   [RFC8801]  "Discovering Provisioning Domain Names and Data", July
+              2020.
+
+   [RFC8805]  "A Format for Self-Published IP Geolocation Feeds", August
+              2020.
+
+   [RFC9388]  "Content Delivery Network Interconnection (CDNI) Footprint
+              Types: Country Subdivision Code and Footprint Union", June
+              2023.
+
+Appendix A.  Appendix A.  Example Topology (Informative)
+
+   The following example illustrates a typical relay mesh topology:
+
+   Home/Ent (NY) Relay Mesh SVC Media MS | A --- B | \ / +----(16ms
+   RTT)-------------> D | / \ | C --- (to SVC)
+
+   *  *Relay D*: JFK (NY), serves Home/Ent with 16ms RTT.
+
+   *  *Relay A, B, C*: Interconnected; A connects to SVC.
+
+   *  Geocode for each enables path selection (e.g., NY client → D → A →
+      SVC) and GDOR (e.g., ensure D and A are in permitted
+      jurisdictions).
+
+Appendix B.  Appendix B.  IATA Code Reference (Informative)
+
+   IATA codes are maintained by the International Air Transport
+   Association.  A subset useful for MoQ relay identification:
+
+                  +======+==============================+
+                  | Code | City/Region                  |
+                  +======+==============================+
+                  | JFK  | New York (John F.  Kennedy)  |
+                  +------+------------------------------+
+                  | LGA  | New York (LaGuardia)         |
+                  +------+------------------------------+
+                  | EWR  | Newark (NYC metro)           |
+                  +------+------------------------------+
+                  | IAD  | Washington Dulles (Virginia) |
+                  +------+------------------------------+
+                  | DCA  | Washington Reagan            |
+                  +------+------------------------------+
+                  | LHR  | London Heathrow              |
+                  +------+------------------------------+
+                  | FRA  | Frankfurt                    |
+                  +------+------------------------------+
+                  | CDG  | Paris Charles de Gaulle      |
+                  +------+------------------------------+
+                  | AMS  | Amsterdam                    |
+                  +------+------------------------------+
+                  | NRT  | Tokyo Narita                 |
+                  +------+------------------------------+
+                  | SIN  | Singapore                    |
+                  +------+------------------------------+
+                  | SYD  | Sydney                       |
+                  +------+------------------------------+
+                  | GRU  | São Paulo                    |
+                  +------+------------------------------+
+
+                                  Table 2
+
+   Operators SHOULD use the official IATA code list for authoritative
+   mappings.
+
+Acknowledgments
+
+   TODO acknowledge.
+
+Authors' Addresses
+
+   Altanai Bisht
+   Cisco Meraki
+   Email: albisht@cisco.com
+
+
+   Tim Evens
+   Cisco
+   Email: tievens@cisco.com
