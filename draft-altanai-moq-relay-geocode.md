@@ -185,67 +185,9 @@ For GDOR and compliance, relays may advertise:
 - **country**: ISO 3166-1 alpha-2 (e.g., "US", "DE").
 - **subdivision**: ISO 3166-2 (e.g., "US-NY", "DE-BY") as in {{RFC9388}}.
 
-# Relay Advertisement Format
+A suggested JSON schema and example for relay geocode advertisement are provided in a related document (see Appendix C).
 
-## JSON Schema
-
-The following JSON structure defines the relay geocode advertisement. It MAY be carried in MoQ catalog extensions, metrics ({{MoQMetrics}}), or a dedicated discovery resource (e.g., well-known URI).
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "MoQ Relay Geocode",
-  "type": "object",
-  "required": ["relay_id", "latitude", "longitude"],
-  "properties": {
-    "relay_id": { "type": "string", "description": "Unique relay identifier" },
-    "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
-    "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
-    "altitude": { "type": "number", "description": "Meters above WGS84 ellipsoid" },
-    "iata_code": { "type": "string", "pattern": "^[A-Z]{3}$", "description": "IATA airport/metro code" },
-    "country": { "type": "string", "pattern": "^[A-Z]{2}$", "description": "ISO 3166-1 alpha-2" },
-    "subdivision": { "type": "string", "description": "ISO 3166-2 subdivision" },
-    "rtt_ms": { "type": "number", "description": "RTT to this relay (ms), if advertised" },
-    "pt_ms": { "type": "number", "description": "Propagation time to relay (ms), if advertised" },
-    "neighbors": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "relay_id": { "type": "string" },
-          "rtt_ms": { "type": "number" },
-          "pt_ms": { "type": "number" }
-        }
-      },
-      "description": "Adjacent relays and inter-relay metrics"
-    }
-  }
-}
-```
-
-## Example Advertisement
-
-Relay D in New York area, with path metrics:
-
-```json
-{
-  "relay_id": "relay-D",
-  "latitude": 40.6413,
-  "longitude": -73.7781,
-  "altitude": 4,
-  "iata_code": "JFK",
-  "country": "US",
-  "subdivision": "US-NY",
-  "rtt_ms": 16,
-  "pt_ms": 12,
-  "neighbors": [
-    { "relay_id": "relay-A", "rtt_ms": 7, "pt_ms": 3 },
-    { "relay_id": "relay-C", "rtt_ms": 12, "pt_ms": 5 }
-  ]
-}
-```
-
-## Integration with MoQ
+# Integration with MoQ
 
 This document proposes several integration options for geocode advertisement and path tracing. 
 
@@ -276,7 +218,7 @@ Relays MAY advertise geocode using standard MOQT messages and streams:
 
 - **PUBLISH**: A relay publishes its geocode advertisement as a track (e.g., under a reserved namespace such as `moq://relay-geocode.moq.arpa/v1/<relay_id>`).
 - **SUBSCRIBE**: Other relays, clients, or orchestration systems SUBSCRIBE to geocode tracks to discover relay locations and neighbor topology.
-- **Streams**: Geocode data is carried in MOQT objects over QUIC streams, using the JSON schema defined in this document as the object payload.
+- **Streams**: Geocode data is carried in MOQT objects over QUIC streams, using the JSON schema defined in the related document (Appendix C) as the object payload.
 
 This approach reuses the same protocol that relays already use for media distribution. No new message types or wire formats are required.
 
@@ -304,7 +246,7 @@ Given two relays with geocode (lat1, lon1) and (lat2, lon2), the approximate gre
 
 ## Path Metrics
 
-When relays advertise `neighbors` with `rtt_ms` and `pt_ms`, a client or orchestration system can:
+When relays advertise neighbor topology (e.g., `neighbors` with `rtt_ms` and `pt_ms` per the schema in Appendix C), a client or orchestration system can:
 
 1. **Build a relay graph**: Nodes = relays, edges = neighbor relationships with RTT/PT.
 2. **Compute paths**: Shortest path by RTT, by PT, or by geographic distance.
@@ -375,6 +317,10 @@ IATA codes are maintained by the International Air Transport Association. A subs
 | GRU  | São Paulo |
 
 Operators SHOULD use the official IATA code list for authoritative mappings.
+
+# Appendix C. Relay Advertisement Format (Informative)
+
+The JSON schema and example for relay geocode advertisement are defined in the related document `moq-relay-geocode-advertisement-format.md`, which accompanies this draft. Implementations may use that schema when advertising geocode via Option 2 (PUBLISH/SUBSCRIBE), Option 3 (Catalog), Option 4 (Metrics), or Option 5 (Discovery).
 
 # Acknowledgments
 {:numbered="false"}
