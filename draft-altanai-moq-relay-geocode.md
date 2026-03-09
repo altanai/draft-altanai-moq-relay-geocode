@@ -10,7 +10,7 @@ date: 2026-03-09
 consensus: true
 v: 1
 area: "Web and Internet Transport"
-workgroup: "moq"
+workgroup: "Media Over QUIC"
 keyword:
   - MOQ
   - Media over QUIC
@@ -22,12 +22,12 @@ keyword:
   - routing
 
 venue:
-  group: "moq"
+  group: "Media Over QUIC"
   type: "Working Group"
   mail: "moq@ietf.org"
   arch: "https://mailarchive.ietf.org/arch/browse/moq/"
-  github: "altanai/moq-relay-geocode"
-  latest: "https://datatracker.ietf.org/doc/draft-altanai-moq-relay-geocode/"
+  github: "altanai/draft-altanai-moq-relay-geocode"
+  latest: "https://altanai.github.io/draft-altanai-moq-relay-geocode/draft-altanai-moq-relay-geocode.html"
 
 author:
   -
