@@ -225,8 +225,6 @@ Geocode MAY be part of metrics exposed per {{MoQMetrics}} for relay selection an
 
 A relay MAY serve geocode at a well-known path (e.g., `/.well-known/moq-relay-geocode`) or via a Setup Option in SETUP, for deployments that prefer HTTP-based or session-level discovery.
 
----
-
 The reserved namespace, extension header type, and exact encoding for the path trace are left to a companion specification or a future revision of {{MoQTransport}}.
 
 # Vicinity and Path Computation
