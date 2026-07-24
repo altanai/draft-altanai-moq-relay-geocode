@@ -182,7 +182,7 @@ An IATA airport code may be included as a human-readable geographic identifier (
 
 This document proposes several integration options for geocode advertisement and path tracing.
 
-### Option 1: Path Trace via MOQT Extension Headers (RECOMMENDED)
+## Option 1: Path Trace via MOQT Extension Headers (RECOMMENDED)
 
 To enable clients to verify the geographic path of media objects as they traverse relays and proxies, relays and proxies MAY append a path-trace entry to a MOQT object extension header as objects are forwarded. Path tracing uses the extension header mechanism described in {{MoQTransport}} (Section 10.2.1.2).
 
@@ -203,7 +203,7 @@ Clients that receive objects can inspect the extension header to reconstruct the
 
 This is the RECOMMENDED for path tracing as it travels in-band with media and enables clients to verify the geographic path directly from received objects.
 
-### Option 2: Geocode Advertisement via MOQT Messages and Streams
+## Option 2: Geocode Advertisement via MOQT Messages and Streams
 
 Relays MAY advertise geocode using standard MOQT messages and streams:
 
@@ -213,15 +213,15 @@ Relays MAY advertise geocode using standard MOQT messages and streams:
 
 This approach reuses the same protocol that relays already use for media distribution. No new message types or wire formats are required.
 
-### Option 3: Catalog Integration
+## Option 3: Catalog Integration
 
 A relay MAY include geocode in catalog metadata for namespaces or tracks it serves. Clients that discover tracks via the catalog can use geocode for relay selection or policy checks.
 
-### Option 4: Metrics Integration
+## Option 4: Metrics Integration
 
 Geocode MAY be part of metrics exposed per {{MoQMetrics}} for relay selection and monitoring. Resources (e.g., relays) can include geocode as attributes in the metrics data model.
 
-### Option 5: Discovery (Well-Known URI or Setup Option)
+## Option 5: Discovery (Well-Known URI or Setup Option)
 
 A relay MAY serve geocode at a well-known path (e.g., `/.well-known/moq-relay-geocode`) or via a Setup Option in SETUP, for deployments that prefer HTTP-based or session-level discovery.
 
