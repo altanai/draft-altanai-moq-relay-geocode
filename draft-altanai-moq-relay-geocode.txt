@@ -5,12 +5,12 @@
 moq                                                             A. Bisht
 Internet-Draft                                              Cisco Meraki
 Intended status: Standards Track                                T. Evens
-Expires: 10 September 2026                                         Cisco
-                                                            9 March 2026
+Expires: 25 January 2027                                           Cisco
+                                                            24 July 2026
 
 
              Geographic Location for Media over QUIC Relays
-                   draft-altanai-moq-relay-geocode-00
+                 draft-altanai-moq-relay-geocode-latest
 
 Abstract
 
@@ -41,7 +41,7 @@ About This Document
    https://www.ietf.org/mailman/listinfo/moq/.
 
    Source for this draft and an issue tracker can be found at
-   https://github.com/altanai/moq-relay-geocode.
+   https://github.com/altanai/draft-altanai-moq-relay-geocode.
 
 Status of This Memo
 
@@ -58,7 +58,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 10 September 2026.
+   This Internet-Draft will expire on 25 January 2027.
 
 Copyright Notice
 
@@ -85,13 +85,16 @@ Table of Contents
      3.3.  Path and Vicinity Awareness
      3.4.  Metrics Integration
    4.  Geocode Representation
-     4.1.  Primary Format: WGS84 Coordinates
-     4.2.  Optional: IATA Code
-     4.3.  Optional: Region and Jurisdiction
-   5.  Relay Advertisement Format
-     5.1.  JSON Schema
-     5.2.  Example Advertisement
-     5.3.  Integration with MoQ
+     4.1.  Suggested Format: WGS84 Coordinates
+     4.2.  Suggested: IATA Code
+   5.  Integration with MoQ
+     5.1.  Option 1: Path Trace via MOQT Extension Headers
+           (RECOMMENDED)
+     5.2.  Option 2: Geocode Advertisement via MOQT Messages and
+           Streams
+     5.3.  Option 3: Catalog Integration
+     5.4.  Option 4: Metrics Integration
+     5.5.  Option 5: Discovery (Well-Known URI or Setup Option)
    6.  Vicinity and Path Computation
      6.1.  Great-Circle Distance
      6.2.  Path Metrics
@@ -106,6 +109,7 @@ Table of Contents
      9.2.  Informative References
    Appendix A.  Appendix A.  Example Topology (Informative)
    Appendix B.  Appendix B.  IATA Code Reference (Informative)
+   Appendix C.  Appendix C.  Relay Advertisement Format (Informative)
    Acknowledgments
    Authors' Addresses
 
@@ -153,6 +157,16 @@ Table of Contents
        compliance audits and geo-fencing enforcement.
 
 1.1.  Design Goals
+
+   *  *Path trace in-band (primary)*: Use MOQT extension headers on
+      objects for path tracing as the RECOMMENDED integration.  Each
+      relay/proxy appends device name and direction; clients can verify
+      the geographic path from received objects.
+
+   *  *Protocol alignment*: Use existing MOQT messages (PUBLISH,
+      SUBSCRIBE) and streams for geocode advertisement, avoiding new
+      message formats.  Relays do not need to invent proprietary
+      messaging for cross-vendor use cases.
 
    *  *Minimal protocol impact*: Reuse existing MoQ catalog, metrics, or
       discovery mechanisms where possible.
@@ -242,9 +256,13 @@ Table of Contents
 
 4.  Geocode Representation
 
-4.1.  Primary Format: WGS84 Coordinates
+   This section is informative.  The following formats are suggested for
+   representing relay geocode; implementations may use alternative
+   representations.
 
-   Relay geocode MUST be representable as WGS84 coordinates (as used in
+4.1.  Suggested Format: WGS84 Coordinates
+
+   Relay geocode may be represented as WGS84 coordinates (as used in
    GeoJSON [RFC7946]):
 
    *  *latitude*: Decimal degrees, -90 to 90.
@@ -257,109 +275,96 @@ Table of Contents
 
    json { "latitude": 40.6413, "longitude": -73.7781, "altitude": 4 }
 
-4.2.  Optional: IATA Code
+4.2.  Suggested: IATA Code
 
-   An IATA airport code MAY be included as a human-readable geographic
-   identifier.  IATA codes are widely used for airports and major metro
-   areas and provide a compact, recognizable reference (e.g., JFK for
-   New York, LHR for London).
+   An IATA airport code may be included as a human-readable geographic
+   identifier (e.g., JFK for New York, LHR for London).  It is advisory
+   only and may correspond to the nearest major airport or metro area
+   where the relay is located; precise routing may use latitude/
+   longitude when geographic accuracy is required.
 
-   *Suggested IATA codes for common relay regions* (informative):
+5.  Integration with MoQ
 
-   +======================+================+===========================+
-   | Region / Metro       | Suggested IATA | Notes                     |
-   +======================+================+===========================+
-   | New York (NYC metro) | JFK, LGA, EWR  | Primary: JFK              |
-   |                      |                | for NYC area              |
-   +----------------------+----------------+---------------------------+
-   | Virginia (DC metro)  | IAD, DCA       | IAD for                   |
-   |                      |                | Ashburn/DC area           |
-   +----------------------+----------------+---------------------------+
-   | London               | LHR, LGW       | LHR for London            |
-   +----------------------+----------------+---------------------------+
-   | Frankfurt            | FRA            | Major EU hub              |
-   +----------------------+----------------+---------------------------+
-   | Paris                | CDG            | Major EU hub              |
-   +----------------------+----------------+---------------------------+
-   | Amsterdam            | AMS            | Major EU hub              |
-   +----------------------+----------------+---------------------------+
-   | Tokyo                | NRT, HND       | NRT for Tokyo             |
-   |                      |                | area                      |
-   +----------------------+----------------+---------------------------+
-   | Singapore            | SIN            | Asia-Pacific              |
-   +----------------------+----------------+---------------------------+
-   | Sydney               | SYD            | Australia                 |
-   +----------------------+----------------+---------------------------+
-   | São Paulo            | GRU            | South America             |
-   +----------------------+----------------+---------------------------+
+   This document proposes several integration options for geocode
+   advertisement and path tracing.
 
-                                  Table 1
+5.1.  Option 1: Path Trace via MOQT Extension Headers (RECOMMENDED)
 
-   The IATA code SHOULD correspond to the nearest major airport or metro
-   area where the relay is located.  It is advisory only; precise
-   routing MUST use latitude/longitude when geographic accuracy is
+   To enable clients to verify the geographic path of media objects as
+   they traverse relays and proxies, relays and proxies MAY append a
+   path-trace entry to a MOQT object extension header as objects are
+   forwarded.  Path tracing uses the extension header mechanism
+   described in [MoQTransport] (Section 10.2.1.2).
+
+   Each path-trace entry in the extension header SHOULD include:
+
+   *  *device*: Name or identifier of the relay or proxy (e.g.,
+      relay_id, hostname, or a compact label such as relay-D).
+
+   *  *direction*: The direction of traversal at this device—e.g.,
+      ingress (object received from upstream toward publisher) or egress
+      (object sent toward downstream subscriber).  Alternative encodings
+      such as upstream/downstream or in/out may be used.
+
+   Additional fields such as iata_code, country, or subdivision MAY be
+   included for compliance and geo-fencing verification.
+
+   Example path-trace entry (informative):
+
+   json { "device": "relay-D", "direction": "egress", "iata_code": "JFK"
+   }
+
+   Clients that receive objects can inspect the extension header to
+   reconstruct the relay path (e.g., relay-D (JFK) egress → relay-A
+   (FRA) ingress → relay-A egress) for compliance audits or geo-fencing
+   enforcement.
+
+   This is the RECOMMENDED for path tracing as it travels in-band with
+   media and enables clients to verify the geographic path directly from
+   received objects.
+
+5.2.  Option 2: Geocode Advertisement via MOQT Messages and Streams
+
+   Relays MAY advertise geocode using standard MOQT messages and
+   streams:
+
+   *  *PUBLISH*: A relay publishes its geocode advertisement as a track
+      (e.g., under a reserved namespace such as moq://relay-
+      geocode.moq.arpa/v1/<relay_id>).
+
+   *  *SUBSCRIBE*: Other relays, clients, or orchestration systems
+      SUBSCRIBE to geocode tracks to discover relay locations and
+      neighbor topology.
+
+   *  *Streams*: Geocode data is carried in MOQT objects over QUIC
+      streams, using the JSON schema defined in the related document
+      (Appendix C) as the object payload.
+
+   This approach reuses the same protocol that relays already use for
+   media distribution.  No new message types or wire formats are
    required.
 
-4.3.  Optional: Region and Jurisdiction
+5.3.  Option 3: Catalog Integration
 
-   For GDOR and compliance, relays MAY advertise:
+   A relay MAY include geocode in catalog metadata for namespaces or
+   tracks it serves.  Clients that discover tracks via the catalog can
+   use geocode for relay selection or policy checks.
 
-   *  *country*: ISO 3166-1 alpha-2 (e.g., "US", "DE").
+5.4.  Option 4: Metrics Integration
 
-   *  *subdivision*: ISO 3166-2 (e.g., "US-NY", "DE-BY") as in
-      [RFC9388].
+   Geocode MAY be part of metrics exposed per [MoQMetrics] for relay
+   selection and monitoring.  Resources (e.g., relays) can include
+   geocode as attributes in the metrics data model.
 
-5.  Relay Advertisement Format
+5.5.  Option 5: Discovery (Well-Known URI or Setup Option)
 
-5.1.  JSON Schema
+   A relay MAY serve geocode at a well-known path (e.g., /.well-known/
+   moq-relay-geocode) or via a Setup Option in SETUP, for deployments
+   that prefer HTTP-based or session-level discovery.
 
-   The following JSON structure defines the relay geocode advertisement.
-   It MAY be carried in MoQ catalog extensions, metrics ([MoQMetrics]),
-   or a dedicated discovery resource (e.g., well-known URI).
-
-   json { "$schema": "http://json-schema.org/draft-07/schema#", "title":
-   "MoQ Relay Geocode", "type": "object", "required": ["relay_id",
-   "latitude", "longitude"], "properties": { "relay_id": { "type":
-   "string", "description": "Unique relay identifier" }, "latitude": {
-   "type": "number", "minimum": -90, "maximum": 90 }, "longitude": {
-   "type": "number", "minimum": -180, "maximum": 180 }, "altitude": {
-   "type": "number", "description": "Meters above WGS84 ellipsoid" },
-   "iata_code": { "type": "string", "pattern": "^[A-Z]{3}$",
-   "description": "IATA airport/metro code" }, "country": { "type":
-   "string", "pattern": "^[A-Z]{2}$", "description": "ISO 3166-1 alpha-
-   2" }, "subdivision": { "type": "string", "description": "ISO 3166-2
-   subdivision" }, "rtt_ms": { "type": "number", "description": "RTT to
-   this relay (ms), if advertised" }, "pt_ms": { "type": "number",
-   "description": "Propagation time to relay (ms), if advertised" },
-   "neighbors": { "type": "array", "items": { "type": "object",
-   "properties": { "relay_id": { "type": "string" }, "rtt_ms": { "type":
-   "number" }, "pt_ms": { "type": "number" } } }, "description":
-   "Adjacent relays and inter-relay metrics" } } }
-
-5.2.  Example Advertisement
-
-   Relay D in New York area, with path metrics:
-
-   json { "relay_id": "relay-D", "latitude": 40.6413, "longitude":
-   -73.7781, "altitude": 4, "iata_code": "JFK", "country": "US",
-   "subdivision": "US-NY", "rtt_ms": 16, "pt_ms": 12, "neighbors": [ {
-   "relay_id": "relay-A", "rtt_ms": 7, "pt_ms": 3 }, { "relay_id":
-   "relay-C", "rtt_ms": 12, "pt_ms": 5 } ] }
-
-5.3.  Integration with MoQ
-
-   *  *Catalog*: A relay MAY include geocode in catalog metadata for
-      namespaces or tracks it serves.
-
-   *  *Metrics*: Geocode MAY be part of metrics exposed per [MoQMetrics]
-      for relay selection and monitoring.
-
-   *  *Discovery*: A relay MAY serve geocode at a well-known path (e.g.,
-      /.well-known/moq-relay-geocode) or via a Setup Option in SETUP.
-
-   The exact wire format and negotiation are left to a companion
-   specification or a future revision of the MoQ transport or metrics
-   documents.
+   The reserved namespace, extension header type, and exact encoding for
+   the path trace are left to a companion specification or a future
+   revision of [MoQTransport].
 
 6.  Vicinity and Path Computation
 
@@ -372,8 +377,9 @@ Table of Contents
 
 6.2.  Path Metrics
 
-   When relays advertise neighbors with rtt_ms and pt_ms, a client or
-   orchestration system can:
+   When relays advertise neighbor topology (e.g., neighbors with rtt_ms
+   and pt_ms per the schema in Appendix C), a client or orchestration
+   system can:
 
    1.  *Build a relay graph*: Nodes = relays, edges = neighbor
        relationships with RTT/PT.
@@ -512,14 +518,25 @@ Appendix B.  Appendix B.  IATA Code Reference (Informative)
                   | GRU  | São Paulo                    |
                   +------+------------------------------+
 
-                                  Table 2
+                                  Table 1
 
    Operators SHOULD use the official IATA code list for authoritative
    mappings.
 
+Appendix C.  Appendix C.  Relay Advertisement Format (Informative)
+
+   The JSON schema and example for relay geocode advertisement are
+   defined in the related document moq-relay-geocode-advertisement-
+   format.md, which accompanies this draft.  Implementations may use
+   that schema when advertising geocode via Option 2 (PUBLISH/
+   SUBSCRIBE), Option 3 (Catalog), Option 4 (Metrics), or Option 5
+   (Discovery).
+
 Acknowledgments
 
-   TODO acknowledge.
+   The authors thank the participants of the Media over QUIC Working
+   Group for discussion and review feedback that helped shape this
+   document.
 
 Authors' Addresses
 
