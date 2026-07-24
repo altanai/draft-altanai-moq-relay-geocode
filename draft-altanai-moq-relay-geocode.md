@@ -3,10 +3,10 @@ title: "Geographic Location for Media over QUIC Relays"
 abbrev: "MoQ Relay Geocode"
 category: std
 
-docname: draft-altanai-moq-relay-geocode-00
+docname: draft-altanai-moq-relay-geocode-01
 submissiontype: IETF
 number:
-date: 2026-03-09
+date: 2026-07-24
 consensus: true
 v: 1
 area: "Web and Internet Transport"
@@ -26,7 +26,7 @@ venue:
   type: "Working Group"
   mail: "moq@ietf.org"
   arch: "https://mailarchive.ietf.org/arch/browse/moq/"
-  github: "altanai/moq-relay-geocode"
+  github: "altanai/draft-altanai-moq-relay-geocode"
   latest: "https://datatracker.ietf.org/doc/draft-altanai-moq-relay-geocode/"
 
 author:
@@ -178,18 +178,9 @@ Example (JSON):
 
 An IATA airport code may be included as a human-readable geographic identifier (e.g., JFK for New York, LHR for London). It is advisory only and may correspond to the nearest major airport or metro area where the relay is located; precise routing may use latitude/longitude when geographic accuracy is required.
 
-## Suggested: Region and Jurisdiction
-
-For GDOR and compliance, relays may advertise:
-
-- **country**: ISO 3166-1 alpha-2 (e.g., "US", "DE").
-- **subdivision**: ISO 3166-2 (e.g., "US-NY", "DE-BY") as in {{RFC9388}}.
-
-A suggested JSON schema and example for relay geocode advertisement are provided in a related document (see Appendix C).
-
 # Integration with MoQ
 
-This document proposes several integration options for geocode advertisement and path tracing. 
+This document proposes several integration options for geocode advertisement and path tracing.
 
 ### Option 1: Path Trace via MOQT Extension Headers (RECOMMENDED)
 
@@ -325,4 +316,5 @@ The JSON schema and example for relay geocode advertisement are defined in the r
 # Acknowledgments
 {:numbered="false"}
 
-TODO acknowledge.
+The authors thank the participants of the Media over QUIC Working Group for
+discussion and review feedback that helped shape this document.
