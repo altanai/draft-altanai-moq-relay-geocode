@@ -3,7 +3,7 @@ title: "Geographic Location for Media over QUIC Relays"
 abbrev: "MoQ Relay Geocode"
 category: std
 
-docname: draft-altanai-moq-relay-geocode-01
+docname: draft-altanai-moq-relay-geocode-latest
 submissiontype: IETF
 number:
 date: 2026-07-24
