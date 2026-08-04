@@ -66,7 +66,7 @@ informative:
 
 --- abstract
 
-This document defines a mechanism for Media over QUIC (MoQ) relays to advertise their geographic location (geocode) and related path metrics. Some clients require their media data to remain locally or geo-fenced within specific jurisdictions for privacy and security compliance (e.g., GDPR, HIPAA, or sector-specific regulations). This mechanism enables service providers to track the geographic path of media packets through the relay mesh and to enforce geo-fencing policies. It supports Geo-Distributed Orchestration and Routing (GDOR), data residency compliance, latency optimization, and relay selection. The specification includes optional IATA airport codes as human-readable geographic identifiers for major relay locations.
+This document defines a mechanism for Media over QUIC (MoQ) relays to advertise their geographic location (geocode) and related path metrics. Some clients require their media data to remain locally or geo-fenced within specific jurisdictions for privacy and security compliance (e.g., GDPR, HIPAA, or sector-specific regulations). This mechanism enables service providers to track the geographic path of media packets through the relay mesh and to enforce geo-fencing policies. It supports Geo-Distributed Orchestration and Routing (GDOR), data residency compliance, latency optimization, and relay selection.
 
 --- middle
 
@@ -92,7 +92,8 @@ Today, MoQ provides no standard way for relays to advertise geographic position.
 - **Protocol alignment**: Use existing MOQT messages (PUBLISH, SUBSCRIBE) and streams for geocode advertisement, avoiding new message formats. Relays do not need to invent proprietary messaging for cross-vendor use cases.
 - **Minimal protocol impact**: Reuse existing MoQ catalog, metrics, or discovery mechanisms where possible.
 - **Interoperability**: Use standard geographic representations (WGS84, GeoJSON) and widely recognized identifiers (IATA codes).
-- **Extensibility**: Allow optional altitude, region codes, and path metrics (RTT, PT) without mandating them.
+- **Extensibility**: Allow optional altitude, region codes, and path metrics (RTT, PT, bandwidth estimate, loss) without mandating them. Advertise identifiers and dynamic metrics in separate SETUP options so each can evolve independently.
+- **Reachability, not fixed topology**: Treat peer-relay information as dynamic reachability (which relays are currently reachable and at what cost), not as a static neighbor list.
 
 # Conventions and Definitions
 
@@ -122,7 +123,7 @@ Some clients require their media data to remain locally or geo-fenced within spe
 - Media for a given jurisdiction is processed within that jurisdiction.
 - Path selection avoids certain regions for policy or cost reasons.
 
-Geocode enables GDOR by allowing relays to advertise their jurisdiction (e.g., via country/region codes) and by allowing path computation to respect geographic boundaries. Service providers can use relay geocode and the advertised neighbor topology to **track the geographic path** of media packets as they traverse the MoQ relay mesh, supporting compliance audits and geo-fencing enforcement.
+Geocode enables GDOR by allowing relays to advertise their jurisdiction (e.g., via country/region codes) and by allowing path computation to respect geographic boundaries. Service providers can use relay geocode and advertised reachability to other relays to **track the geographic path** of media packets as they traverse the MoQ relay mesh, supporting compliance audits and geo-fencing enforcement.
 
 ## Path and Vicinity Awareness
 
@@ -133,7 +134,7 @@ In a relay mesh (e.g., A↔B↔C↔D), knowing the geocode of each relay allows:
 
 ## Metrics Integration
 
-Deployments commonly measure **RTT to Relay** and **PT (Propagation Time) to Relay** as key metrics. Geocode complements these by providing a stable, policy-relevant attribute (location) that does not change with network conditions, while RTT/PT provide dynamic performance signals.
+Deployments commonly measure **RTT to Relay**, **PT (Propagation Time) to Relay**, bandwidth estimate, and loss as key metrics. Geocode complements these by providing a stable, policy-relevant attribute (location) that does not change with network conditions, while RTT, PT, bandwidth, and loss provide dynamic performance signals.
 
 # Geocode Representation
 
@@ -191,7 +192,7 @@ This is the RECOMMENDED for path tracing as it travels in-band with media and en
 Relays MAY advertise geocode using standard MOQT messages and streams:
 
 - **PUBLISH**: A relay publishes its geocode advertisement as a track (e.g., under a reserved namespace such as `moq://relay-geocode.example/v1/<relay_id>`).
-- **SUBSCRIBE**: Other relays, clients, or orchestration systems SUBSCRIBE to geocode tracks to discover relay locations and neighbor topology.
+- **SUBSCRIBE**: Other relays, clients, or orchestration systems SUBSCRIBE to geocode tracks to discover relay locations and reachability to other relays.
 - **Streams**: Geocode data is carried in MOQT objects over QUIC streams, using the JSON schema defined in the related document (Appendix C) as the object payload.
 
 This approach reuses the same protocol that relays already use for media distribution. No new message types or wire formats are required.
@@ -204,11 +205,77 @@ A relay MAY include geocode in catalog metadata for namespaces or tracks it serv
 
 Geocode MAY be part of metrics exposed per {{MoQMetrics}} for relay selection and monitoring. Resources (e.g., relays) can include geocode as attributes in the metrics data model.
 
-## Option 5: Discovery (Well-Known URI or Setup Option)
+## Option 5: Discovery via MOQT SETUP Options (RECOMMENDED for session discovery)
 
-A relay MAY serve geocode at a well-known path (e.g., `/.well-known/moq-relay-geocode`) or via a Setup Option in SETUP, for deployments that prefer HTTP-based or session-level discovery. Deployments MAY also advertise geocode as provisioning-domain data per {{RFC8801}}.
+Discovery of relay identity and path metrics is expected to normalize on MOQT SETUP options (see {{MoQTransport}}). Relays that support geocode advertisement SHOULD include the Setup options defined in this section in SETUP. Endpoints MUST ignore unknown Setup options, enabling incremental deployment.
 
-The reserved namespace, extension header type, and exact encoding for the path trace are left to a companion specification or a future revision of {{MoQTransport}}.
+To allow independent evolution and selective advertisement, identifiers and dynamic metric values are carried in **separate** Setup options rather than a single combined blob.
+
+### GEOCODE_IDENTITY Setup Option
+
+This option carries stable geographic identifiers for the advertising relay. The option type is `GEOCODE_IDENTITY` (see {{iana-setup}}). The value is a length-prefixed UTF-8 JSON object with the following fields:
+
+- `relay_id` (string, REQUIRED): Unique relay identifier.
+- `latitude` / `longitude` (number, REQUIRED): WGS84 coordinates.
+- `altitude` (number, OPTIONAL): Meters above WGS84 ellipsoid.
+- `iata_code` (string, OPTIONAL): Three-letter IATA airport/metro code.
+- `country` (string, OPTIONAL): ISO 3166-1 alpha-2.
+- `subdivision` (string, OPTIONAL): ISO 3166-2 subdivision code {{RFC9388}}.
+
+Example (informative):
+
+```json
+{
+  "relay_id": "relay-D",
+  "latitude": 40.6413,
+  "longitude": -73.7781,
+  "altitude": 4,
+  "iata_code": "JFK",
+  "country": "US",
+  "subdivision": "US-NY"
+}
+```
+
+### GEOCODE_METRICS Setup Option
+
+This option carries dynamic path metrics for the advertising relay and for reachability to other relays. The option type is `GEOCODE_METRICS` (see {{iana-setup}}). The value is a length-prefixed UTF-8 JSON object with the following fields:
+
+- `rtt_ms` (number, OPTIONAL): RTT to this relay in milliseconds.
+- `pt_ms` (number, OPTIONAL): Propagation time to this relay in milliseconds.
+- `bw_kbps` (number, OPTIONAL): Bandwidth estimate toward or via this relay, in kilobits per second.
+- `loss` (number, OPTIONAL): Observed or estimated loss ratio in the range 0.0 to 1.0.
+- `reachable` (array, OPTIONAL): Dynamic reachability entries for other relays (see below).
+
+Reachability entries describe which other relays are currently reachable and at what cost. Topology in MoQ deployments is dynamic, so this MUST NOT be interpreted as a fixed neighbor graph. Each entry MAY include:
+
+- `relay_id` (string, REQUIRED): Identifier of the reachable relay.
+- `rtt_ms`, `pt_ms`, `bw_kbps`, `loss` (number, OPTIONAL): Metrics for the path or adjacency toward that relay.
+
+Example (informative):
+
+```json
+{
+  "rtt_ms": 16,
+  "pt_ms": 12,
+  "bw_kbps": 50000,
+  "loss": 0.001,
+  "reachable": [
+    { "relay_id": "relay-A", "rtt_ms": 7, "pt_ms": 3, "bw_kbps": 80000, "loss": 0.0 },
+    { "relay_id": "relay-C", "rtt_ms": 12, "pt_ms": 5, "bw_kbps": 40000, "loss": 0.002 }
+  ]
+}
+```
+
+A relay MAY send `GEOCODE_IDENTITY` without `GEOCODE_METRICS`, or update metrics more frequently than identity (e.g., by re-sending SETUP options where the deployment allows, or by publishing updated metrics via Option 2 or Option 4). Additional Setup options MAY be defined later for further metric classes without changing `GEOCODE_IDENTITY`.
+
+### Other Discovery Mechanisms
+
+As alternatives or complements to SETUP options, a relay MAY also:
+
+- Serve geocode at a well-known path (e.g., `/.well-known/moq-relay-geocode`).
+- Advertise geocode as provisioning-domain data per {{RFC8801}}.
+
+The reserved namespace for Option 2, the path-trace extension header type for Option 1, and exact binary encodings for SETUP option values (if not JSON) are left to a companion specification or a future revision of {{MoQTransport}}. Until code points are assigned, experimental deployments MUST use privately negotiated option types.
 
 # Vicinity and Path Computation
 
@@ -218,11 +285,12 @@ Given two relays with geocode (lat1, lon1) and (lat2, lon2), the approximate gre
 
 ## Path Metrics
 
-When relays advertise neighbor topology (e.g., `neighbors` with `rtt_ms` and `pt_ms` per the schema in Appendix C), a client or orchestration system can:
+When relays advertise reachability (e.g., `reachable` with `rtt_ms`, `pt_ms`, `bw_kbps`, and `loss` per Appendix C or the `GEOCODE_METRICS` Setup option), a client or orchestration system can:
 
-1. **Build a relay graph**: Nodes = relays, edges = neighbor relationships with RTT/PT.
-2. **Compute paths**: Shortest path by RTT, by PT, or by geographic distance.
+1. **Build a relay graph**: Nodes = relays, edges = current reachability relationships with RTT/PT/bandwidth/loss.
+2. **Compute paths**: Shortest or best path by RTT, PT, bandwidth, loss, or geographic distance.
 3. **Apply GDOR constraints**: Filter paths to those that stay within required jurisdictions (using `country` and `subdivision` codes as in {{RFC9388}}).
+4. **Refresh dynamically**: Treat reachability as time-varying; do not assume a static neighbor list.
 
 ## Vicinity Semantics
 
@@ -246,8 +314,23 @@ When relays advertise neighbor topology (e.g., `neighbors` with `rtt_ms` and `pt
 - Adversaries could advertise false geocode to attract traffic or evade geographic restrictions. Relays SHOULD be authenticated; geocode from untrusted sources SHOULD be validated or ignored.
 
 # IANA Considerations
+{#iana}
 
-This document does not require IANA actions. If a well-known URI or a MoQ parameter type is registered in the future, the appropriate IANA registry would be updated.
+## MOQT Setup Option Types
+{#iana-setup}
+
+This document requests registration of the following MOQT Setup Option types in the appropriate MOQT registry (see {{MoQTransport}}):
+
+| Name | Value | Description | Reference |
+|------|-------|-------------|-----------|
+| GEOCODE_IDENTITY | TBD1 | Relay geographic identity (stable identifiers) | This document |
+| GEOCODE_METRICS | TBD2 | Relay path metrics and reachability | This document |
+
+Until values are assigned, experimental use MUST use privately negotiated option types.
+
+## Other Registrations
+
+If a well-known URI (e.g., `/.well-known/moq-relay-geocode`) or a path-trace extension header type is standardized, the appropriate IANA registry would be updated in a future revision.
 
 --- back
 
@@ -292,7 +375,7 @@ Operators SHOULD use the official IATA code list for authoritative mappings.
 
 # Relay Advertisement Format (Informative)
 
-The JSON schema and example for relay geocode advertisement are defined in the related document `moq-relay-geocode-advertisement-format.md`, which accompanies this draft. Implementations may use that schema when advertising geocode via Option 2 (PUBLISH/SUBSCRIBE), Option 3 (Catalog), Option 4 (Metrics), or Option 5 (Discovery).
+The JSON schema and examples for relay geocode identity, metrics, and reachability are defined in the related document `moq-relay-geocode-advertisement-format.md`, which accompanies this draft. Implementations may use that schema when advertising geocode via Option 2 (PUBLISH/SUBSCRIBE), Option 3 (Catalog), Option 4 (Metrics), or Option 5 (SETUP options).
 
 # Acknowledgments
 {:numbered="false"}
