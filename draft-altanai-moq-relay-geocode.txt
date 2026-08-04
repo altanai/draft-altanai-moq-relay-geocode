@@ -5,8 +5,8 @@
 moq                                                             A. Bisht
 Internet-Draft                                              Cisco Meraki
 Intended status: Standards Track                                T. Evens
-Expires: 25 January 2027                                           Cisco
-                                                            24 July 2026
+Expires: 5 February 2027                                           Cisco
+                                                           4 August 2026
 
 
              Geographic Location for Media over QUIC Relays
@@ -58,7 +58,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 25 January 2027.
+   This Internet-Draft will expire on 5 February 2027.
 
 Copyright Notice
 
@@ -107,9 +107,9 @@ Table of Contents
    9.  References
      9.1.  Normative References
      9.2.  Informative References
-   Appendix A.  Appendix A.  Example Topology (Informative)
-   Appendix B.  Appendix B.  IATA Code Reference (Informative)
-   Appendix C.  Appendix C.  Relay Advertisement Format (Informative)
+   Appendix A.  Example Topology (Informative)
+   Appendix B.  IATA Code Reference (Informative)
+   Appendix C.  Relay Advertisement Format (Informative)
    Acknowledgments
    Authors' Addresses
 
@@ -118,10 +118,10 @@ Table of Contents
    Media over QUIC Transport (MOQT) [MoQTransport] uses a relay-based
    architecture where publishers push media to relays and subscribers
    pull from relays.  Relays can be chained for CDN-like distribution,
-   forming a mesh of interconnected nodes.  In such topologies—as
+   forming a mesh of interconnected nodes.  In such topologies, as
    illustrated by deployments with multiple relays (e.g., relays A, B,
-   C, D) connecting Home/Enterprise clients to a Service Media
-   backend—the following questions arise:
+   C, D) connecting Home/Enterprise clients to a Service Media backend,
+   the following questions arise:
 
    *  *Where* is each relay located geographically?
 
@@ -132,10 +132,11 @@ Table of Contents
 
    Today, MoQ provides no standard way for relays to advertise
    geographic position.  Clients and orchestration systems rely on
-   external mechanisms (e.g., IP geolocation, manual configuration) that
-   are often imprecise, inconsistent, or unavailable.  This document
-   specifies a lightweight, protocol-aligned mechanism for relays to
-   advertise geocode and related metrics, enabling:
+   external mechanisms (e.g., IP geolocation feeds [RFC8805], manual
+   configuration) that are often imprecise, inconsistent, or
+   unavailable.  This document specifies a lightweight, protocol-aligned
+   mechanism for relays to advertise geocode and related metrics,
+   enabling:
 
    1.  *Vicinity and path computation*: Determining physical proximity
        and logical paths between relays.
@@ -301,7 +302,7 @@ Table of Contents
    *  *device*: Name or identifier of the relay or proxy (e.g.,
       relay_id, hostname, or a compact label such as relay-D).
 
-   *  *direction*: The direction of traversal at this device—e.g.,
+   *  *direction*: The direction of traversal at this device, e.g.,
       ingress (object received from upstream toward publisher) or egress
       (object sent toward downstream subscriber).  Alternative encodings
       such as upstream/downstream or in/out may be used.
@@ -330,7 +331,7 @@ Table of Contents
 
    *  *PUBLISH*: A relay publishes its geocode advertisement as a track
       (e.g., under a reserved namespace such as moq://relay-
-      geocode.moq.arpa/v1/<relay_id>).
+      geocode.example/v1/<relay_id>).
 
    *  *SUBSCRIBE*: Other relays, clients, or orchestration systems
       SUBSCRIBE to geocode tracks to discover relay locations and
@@ -360,7 +361,8 @@ Table of Contents
 
    A relay MAY serve geocode at a well-known path (e.g., /.well-known/
    moq-relay-geocode) or via a Setup Option in SETUP, for deployments
-   that prefer HTTP-based or session-level discovery.
+   that prefer HTTP-based or session-level discovery.  Deployments MAY
+   also advertise geocode as provisioning-domain data per [RFC8801].
 
    The reserved namespace, extension header type, and exact encoding for
    the path trace are left to a companion specification or a future
@@ -388,7 +390,8 @@ Table of Contents
        distance.
 
    3.  *Apply GDOR constraints*: Filter paths to those that stay within
-       required jurisdictions (using country, subdivision).
+       required jurisdictions (using country and subdivision codes as in
+       [RFC9388]).
 
 6.3.  Vicinity Semantics
 
@@ -438,7 +441,9 @@ Table of Contents
               <https://www.rfc-editor.org/rfc/rfc2119>.
 
    [RFC7946]  Butler, H., Daly, M., Doyle, A., Gillies, S., Hagen, S.,
-              and T. Schaub, "The GeoJSON Format", August 2016.
+              and T. Schaub, "The GeoJSON Format", RFC 7946,
+              DOI 10.17487/RFC7946, August 2016,
+              <https://www.rfc-editor.org/rfc/rfc7946>.
 
    [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
               2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
@@ -458,22 +463,32 @@ Table of Contents
               2026, <https://datatracker.ietf.org/doc/draft-ietf-moq-
               transport/>.
 
-   [RFC8801]  "Discovering Provisioning Domain Names and Data", July
-              2020.
+   [RFC8801]  Pfister, P., Vyncke, É., Pauly, T., Schinazi, D., and W.
+              Shao, "Discovering Provisioning Domain Names and Data",
+              RFC 8801, DOI 10.17487/RFC8801, July 2020,
+              <https://www.rfc-editor.org/rfc/rfc8801>.
 
-   [RFC8805]  "A Format for Self-Published IP Geolocation Feeds", August
-              2020.
+   [RFC8805]  Kline, E., Duleba, K., Szamonek, Z., Moser, S., and W.
+              Kumari, "A Format for Self-Published IP Geolocation
+              Feeds", RFC 8805, DOI 10.17487/RFC8805, August 2020,
+              <https://www.rfc-editor.org/rfc/rfc8805>.
 
-   [RFC9388]  "Content Delivery Network Interconnection (CDNI) Footprint
-              Types: Country Subdivision Code and Footprint Union", June
-              2023.
+   [RFC9388]  Sopher, N. and S. Mishra, "Content Delivery Network
+              Interconnection (CDNI) Footprint Types: Country
+              Subdivision Code and Footprint Union", RFC 9388,
+              DOI 10.17487/RFC9388, July 2023,
+              <https://www.rfc-editor.org/rfc/rfc9388>.
 
-Appendix A.  Appendix A.  Example Topology (Informative)
+Appendix A.  Example Topology (Informative)
 
    The following example illustrates a typical relay mesh topology:
 
-   Home/Ent (NY) Relay Mesh SVC Media MS | A --- B | \ / +----(16ms
-   RTT)-------------> D | / \ | C --- (to SVC)
+Home/Ent (NY)                    Relay Mesh                    SVC Media MS
+    |                          A --- B
+    |                           \   /
+    +----(16ms RTT)-------------> D
+    |                           /   \
+    |                          C --- (to SVC)
 
    *  *Relay D*: JFK (NY), serves Home/Ent with 16ms RTT.
 
@@ -483,7 +498,7 @@ Appendix A.  Appendix A.  Example Topology (Informative)
       SVC) and GDOR (e.g., ensure D and A are in permitted
       jurisdictions).
 
-Appendix B.  Appendix B.  IATA Code Reference (Informative)
+Appendix B.  IATA Code Reference (Informative)
 
    IATA codes are maintained by the International Air Transport
    Association.  A subset useful for MoQ relay identification:
@@ -515,7 +530,7 @@ Appendix B.  Appendix B.  IATA Code Reference (Informative)
                   +------+------------------------------+
                   | SYD  | Sydney                       |
                   +------+------------------------------+
-                  | GRU  | São Paulo                    |
+                  | GRU  | Sao Paulo                    |
                   +------+------------------------------+
 
                                   Table 1
@@ -523,7 +538,7 @@ Appendix B.  Appendix B.  IATA Code Reference (Informative)
    Operators SHOULD use the official IATA code list for authoritative
    mappings.
 
-Appendix C.  Appendix C.  Relay Advertisement Format (Informative)
+Appendix C.  Relay Advertisement Format (Informative)
 
    The JSON schema and example for relay geocode advertisement are
    defined in the related document moq-relay-geocode-advertisement-
