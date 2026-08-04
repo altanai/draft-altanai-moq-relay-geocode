@@ -6,7 +6,7 @@ category: std
 docname: draft-altanai-moq-relay-geocode-latest
 submissiontype: IETF
 number:
-date: 2026-07-24
+date: 2026-08-04
 consensus: true
 v: 1
 area: "Web and Internet Transport"
@@ -40,18 +40,7 @@ author:
     email: tievens@cisco.com
 
 normative:
-  RFC2119:
-  RFC8174:
   RFC7946:
-    title: "The GeoJSON Format"
-    date: 2016-08
-    author:
-      - name: H. Butler
-      - name: M. Daly
-      - name: A. Doyle
-      - name: S. Gillies
-      - name: S. Hagen
-      - name: T. Schaub
 
 informative:
   MoQTransport:
@@ -71,14 +60,8 @@ informative:
       Internet-Draft: draft-jennings-moq-metrics-02
     target: "https://datatracker.ietf.org/doc/draft-jennings-moq-metrics/"
   RFC8801:
-    title: "Discovering Provisioning Domain Names and Data"
-    date: 2020-07
-  RFC9388:
-    title: "Content Delivery Network Interconnection (CDNI) Footprint Types: Country Subdivision Code and Footprint Union"
-    date: 2023-06
   RFC8805:
-    title: "A Format for Self-Published IP Geolocation Feeds"
-    date: 2020-08
+  RFC9388:
 ---
 
 --- abstract
@@ -89,13 +72,13 @@ This document defines a mechanism for Media over QUIC (MoQ) relays to advertise 
 
 # Introduction
 
-Media over QUIC Transport (MOQT) {{MoQTransport}} uses a relay-based architecture where publishers push media to relays and subscribers pull from relays. Relays can be chained for CDN-like distribution, forming a mesh of interconnected nodes. In such topologies—as illustrated by deployments with multiple relays (e.g., relays A, B, C, D) connecting Home/Enterprise clients to a Service Media backend—the following questions arise:
+Media over QUIC Transport (MOQT) {{MoQTransport}} uses a relay-based architecture where publishers push media to relays and subscribers pull from relays. Relays can be chained for CDN-like distribution, forming a mesh of interconnected nodes. In such topologies, as illustrated by deployments with multiple relays (e.g., relays A, B, C, D) connecting Home/Enterprise clients to a Service Media backend, the following questions arise:
 
 - **Where** is each relay located geographically?
 - **How close** are relays to each other and to clients?
 - **Which path** through the relay mesh minimizes latency or satisfies policy?
 
-Today, MoQ provides no standard way for relays to advertise geographic position. Clients and orchestration systems rely on external mechanisms (e.g., IP geolocation, manual configuration) that are often imprecise, inconsistent, or unavailable. This document specifies a lightweight, protocol-aligned mechanism for relays to advertise geocode and related metrics, enabling:
+Today, MoQ provides no standard way for relays to advertise geographic position. Clients and orchestration systems rely on external mechanisms (e.g., IP geolocation feeds {{RFC8805}}, manual configuration) that are often imprecise, inconsistent, or unavailable. This document specifies a lightweight, protocol-aligned mechanism for relays to advertise geocode and related metrics, enabling:
 
 1. **Vicinity and path computation**: Determining physical proximity and logical paths between relays.
 2. **GDOR (Geo-Distributed Orchestration/Routing)**: Making routing and placement decisions based on geography (e.g., route through EU relays for GDPR, avoid certain jurisdictions).
@@ -189,7 +172,7 @@ To enable clients to verify the geographic path of media objects as they travers
 Each path-trace entry in the extension header SHOULD include:
 
 - **device**: Name or identifier of the relay or proxy (e.g., `relay_id`, hostname, or a compact label such as `relay-D`).
-- **direction**: The direction of traversal at this device—e.g., `ingress` (object received from upstream toward publisher) or `egress` (object sent toward downstream subscriber). Alternative encodings such as `upstream`/`downstream` or `in`/`out` may be used.
+- **direction**: The direction of traversal at this device, e.g., `ingress` (object received from upstream toward publisher) or `egress` (object sent toward downstream subscriber). Alternative encodings such as `upstream`/`downstream` or `in`/`out` may be used.
 
 Additional fields such as `iata_code`, `country`, or `subdivision` MAY be included for compliance and geo-fencing verification.
 
@@ -207,7 +190,7 @@ This is the RECOMMENDED for path tracing as it travels in-band with media and en
 
 Relays MAY advertise geocode using standard MOQT messages and streams:
 
-- **PUBLISH**: A relay publishes its geocode advertisement as a track (e.g., under a reserved namespace such as `moq://relay-geocode.moq.arpa/v1/<relay_id>`).
+- **PUBLISH**: A relay publishes its geocode advertisement as a track (e.g., under a reserved namespace such as `moq://relay-geocode.example/v1/<relay_id>`).
 - **SUBSCRIBE**: Other relays, clients, or orchestration systems SUBSCRIBE to geocode tracks to discover relay locations and neighbor topology.
 - **Streams**: Geocode data is carried in MOQT objects over QUIC streams, using the JSON schema defined in the related document (Appendix C) as the object payload.
 
@@ -223,7 +206,7 @@ Geocode MAY be part of metrics exposed per {{MoQMetrics}} for relay selection an
 
 ## Option 5: Discovery (Well-Known URI or Setup Option)
 
-A relay MAY serve geocode at a well-known path (e.g., `/.well-known/moq-relay-geocode`) or via a Setup Option in SETUP, for deployments that prefer HTTP-based or session-level discovery.
+A relay MAY serve geocode at a well-known path (e.g., `/.well-known/moq-relay-geocode`) or via a Setup Option in SETUP, for deployments that prefer HTTP-based or session-level discovery. Deployments MAY also advertise geocode as provisioning-domain data per {{RFC8801}}.
 
 The reserved namespace, extension header type, and exact encoding for the path trace are left to a companion specification or a future revision of {{MoQTransport}}.
 
@@ -239,7 +222,7 @@ When relays advertise neighbor topology (e.g., `neighbors` with `rtt_ms` and `pt
 
 1. **Build a relay graph**: Nodes = relays, edges = neighbor relationships with RTT/PT.
 2. **Compute paths**: Shortest path by RTT, by PT, or by geographic distance.
-3. **Apply GDOR constraints**: Filter paths to those that stay within required jurisdictions (using `country`, `subdivision`).
+3. **Apply GDOR constraints**: Filter paths to those that stay within required jurisdictions (using `country` and `subdivision` codes as in {{RFC9388}}).
 
 ## Vicinity Semantics
 
@@ -268,24 +251,24 @@ This document does not require IANA actions. If a well-known URI or a MoQ parame
 
 --- back
 
-# Appendix A. Example Topology (Informative)
+# Example Topology (Informative)
 
 The following example illustrates a typical relay mesh topology:
 
-```
+~~~~~
 Home/Ent (NY)                    Relay Mesh                    SVC Media MS
     |                          A --- B
     |                           \   /
     +----(16ms RTT)-------------> D
     |                           /   \
     |                          C --- (to SVC)
-```
+~~~~~
 
 - **Relay D**: JFK (NY), serves Home/Ent with 16ms RTT.
 - **Relay A, B, C**: Interconnected; A connects to SVC.
 - Geocode for each enables path selection (e.g., NY client → D → A → SVC) and GDOR (e.g., ensure D and A are in permitted jurisdictions).
 
-# Appendix B. IATA Code Reference (Informative)
+# IATA Code Reference (Informative)
 
 IATA codes are maintained by the International Air Transport Association. A subset useful for MoQ relay identification:
 
@@ -303,11 +286,11 @@ IATA codes are maintained by the International Air Transport Association. A subs
 | NRT  | Tokyo Narita |
 | SIN  | Singapore |
 | SYD  | Sydney |
-| GRU  | São Paulo |
+| GRU  | Sao Paulo |
 
 Operators SHOULD use the official IATA code list for authoritative mappings.
 
-# Appendix C. Relay Advertisement Format (Informative)
+# Relay Advertisement Format (Informative)
 
 The JSON schema and example for relay geocode advertisement are defined in the related document `moq-relay-geocode-advertisement-format.md`, which accompanies this draft. Implementations may use that schema when advertising geocode via Option 2 (PUBLISH/SUBSCRIBE), Option 3 (Catalog), Option 4 (Metrics), or Option 5 (Discovery).
 
