@@ -2,126 +2,114 @@
 
 *Related document for draft-altanai-moq-relay-geocode*
 
-This document defines the JSON schemas and examples for relay geocode
-identity, path metrics, and reachability. It is a supporting
-specification for [draft-altanai-moq-relay-geocode](https://datatracker.ietf.org/doc/draft-altanai-moq-relay-geocode/).
+This document gives informative JSON examples for the relay identity and
+client-intent Setup Options, and the dynamic metrics and path-event tracks.
+Networked JSON is encoded as UTF-8 without a byte order mark, following
+[RFC 8259](https://www.rfc-editor.org/rfc/rfc8259.html#section-8.1). UTF-7 is
+not used.
 
-Advertisements are intentionally split so that stable identifiers and
-dynamic metrics can be carried separately (e.g., as distinct MOQT SETUP
-options: `GEOCODE_IDENTITY` and `GEOCODE_METRICS`).
+Relay identity is sent by each relay in its own SETUP message and is also
+available on the `identity` track in the Track Namespace
+`("relay-geocode.moq.arpa", "v1", <relay-id>)`. Dynamic metrics and forwarding events use the `metrics` and
+`path-events` tracks in that namespace; they are not placed in SETUP.
 
----
+## Relay Identity (`GEOCODE_IDENTITY`)
 
-## Identity Schema (`GEOCODE_IDENTITY`)
-
-Stable geographic identifiers for a relay.
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "MoQ Relay Geocode Identity",
-  "type": "object",
-  "required": ["relay_id", "latitude", "longitude"],
-  "properties": {
-    "relay_id": { "type": "string", "description": "Unique relay identifier" },
-    "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
-    "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
-    "altitude": { "type": "number", "description": "Meters above WGS84 ellipsoid" },
-    "iata_code": { "type": "string", "pattern": "^[A-Z]{3}$", "description": "IATA airport/metro code" },
-    "country": { "type": "string", "pattern": "^[A-Z]{2}$", "description": "ISO 3166-1 alpha-2" },
-    "subdivision": { "type": "string", "description": "ISO 3166-2 subdivision" }
-  }
-}
-```
-
-### Example identity
+The `geocode` member contains exactly one primary representation: WGS84 or
+IATA. Country and subdivision are separate jurisdiction claims. IATA codes
+identify an airport or metro area and do not establish a jurisdiction.
 
 ```json
 {
-  "relay_id": "relay-D",
-  "latitude": 40.6413,
-  "longitude": -73.7781,
-  "altitude": 4,
-  "iata_code": "JFK",
+  "relay_id": "relay-d",
+  "geocode": {
+    "type": "wgs84",
+    "latitude": 40.7,
+    "longitude": -74.0
+  },
   "country": "US",
-  "subdivision": "US-NY"
+  "subdivision": "US-NY",
+  "location_precision": "coarse"
 }
 ```
 
----
-
-## Metrics Schema (`GEOCODE_METRICS`)
-
-Dynamic path metrics and reachability. Topology in MoQ deployments is
-dynamic; the `reachable` array describes current reachability to other
-relays, not a fixed neighbor list.
+An IATA representation uses this form instead:
 
 ```json
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "MoQ Relay Geocode Metrics",
-  "type": "object",
-  "properties": {
-    "rtt_ms": { "type": "number", "description": "RTT to this relay (ms)" },
-    "pt_ms": { "type": "number", "description": "Propagation time to relay (ms)" },
-    "bw_kbps": { "type": "number", "description": "Bandwidth estimate (kbps)" },
-    "loss": { "type": "number", "minimum": 0, "maximum": 1, "description": "Loss ratio 0.0-1.0" },
-    "reachable": {
-      "type": "array",
-      "description": "Currently reachable relays and path metrics (dynamic, not a fixed topology)",
-      "items": {
-        "type": "object",
-        "required": ["relay_id"],
-        "properties": {
-          "relay_id": { "type": "string" },
-          "rtt_ms": { "type": "number" },
-          "pt_ms": { "type": "number" },
-          "bw_kbps": { "type": "number" },
-          "loss": { "type": "number", "minimum": 0, "maximum": 1 }
-        }
-      }
-    }
-  }
+  "relay_id": "relay-d",
+  "geocode": { "type": "iata", "code": "JFK" },
+  "country": "US",
+  "subdivision": "US-NY",
+  "location_precision": "jurisdiction-only"
 }
 ```
 
-### Example metrics
+## Client Policy Intent (`GEOCODE_INTENT`)
+
+The client can request allowed jurisdictions and/or a nearby relay without
+sending exact client coordinates:
 
 ```json
 {
-  "rtt_ms": 16,
-  "pt_ms": 12,
+  "allowed_jurisdictions": ["US", "US-NY"],
+  "near_me": true,
+  "desired_geocode": { "type": "iata", "code": "JFK" }
+}
+```
+
+This option expresses policy intent; it does not grant authorization or
+authenticate the client. The receiving relay applies its authorization and
+trust policy before selecting or redirecting to a relay.
+
+## Dynamic Metrics Track
+
+Each sample is timestamped and identifies its peer and measurement scope.
+SRTT values are per adjacent QUIC connection; they are not end-to-end latency.
+
+```json
+{
+  "sampled_at": "2026-11-25T20:00:00Z",
+  "peer_id": "relay-a",
+  "srtt_ms": 8.2,
+  "pt_ms": 5.1,
   "bw_kbps": 50000,
-  "loss": 0.001,
-  "reachable": [
-    { "relay_id": "relay-A", "rtt_ms": 7, "pt_ms": 3, "bw_kbps": 80000, "loss": 0.0 },
-    { "relay_id": "relay-C", "rtt_ms": 12, "pt_ms": 5, "bw_kbps": 40000, "loss": 0.002 }
-  ]
+  "loss": 0.001
 }
 ```
 
----
+## Hop-by-Hop Path Event (`path-events` track)
 
-## Field Reference
+Each event correlates a relay forwarding action to the MOQT Object and records
+the relay's ingress and egress peers. The byte count is the serialized MOQT
+Object length, including its header, properties, and payload, but excluding
+QUIC framing. `connection_object_bytes_received_total` is a monotonic counter
+for that ingress connection and uses `counter_epoch` to distinguish resets.
 
-### Identity fields
+```json
+{
+  "version": 1,
+  "object": {
+    "namespace": ["example", "media"],
+    "track": "video",
+    "group_id": 12,
+    "object_id": 7
+  },
+  "relay_id": "relay-d",
+  "ingress_peer": "publisher-edge",
+  "egress_peer": "relay-a",
+  "direction": "publisher-to-subscriber",
+  "geocode": { "type": "iata", "code": "JFK" },
+  "observed_at": "2026-11-25T20:00:00Z",
+  "ingress_srtt_ms": 16.4,
+  "egress_srtt_ms": 8.2,
+  "object_bytes_received": 1200,
+  "connection_object_bytes_received_total": 987654321,
+  "counter_epoch": "connection-7"
+}
+```
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| relay_id | Yes | Unique relay identifier |
-| latitude | Yes | Decimal degrees, -90 to 90 (WGS84) |
-| longitude | Yes | Decimal degrees, -180 to 180 (WGS84) |
-| altitude | No | Meters above WGS84 ellipsoid |
-| iata_code | No | 3-letter IATA airport/metro code |
-| country | No | ISO 3166-1 alpha-2 |
-| subdivision | No | ISO 3166-2 subdivision |
-
-### Metrics fields
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| rtt_ms | No | RTT to this relay (ms) |
-| pt_ms | No | Propagation time to relay (ms) |
-| bw_kbps | No | Bandwidth estimate (kbps) |
-| loss | No | Loss ratio in range 0.0 to 1.0 |
-| reachable | No | Dynamic reachability to other relays with optional path metrics |
+An event reports the relay's forwarding action. It does not prove that the
+egress peer received the Object or independently prove the relay's location.
+The relay can publish one event per downstream forwarding action when an
+Object is replicated to multiple peers.
