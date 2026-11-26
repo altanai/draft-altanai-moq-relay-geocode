@@ -6,7 +6,7 @@ category: std
 docname: draft-altanai-moq-relay-geocode-latest
 submissiontype: IETF
 number:
-date: 2026-08-04
+date: 2026-11-25
 consensus: true
 v: 1
 area: "Web and Internet Transport"
@@ -41,6 +41,7 @@ author:
 
 normative:
   RFC7946:
+  RFC8259:
 
 informative:
   MoQTransport:
@@ -49,7 +50,7 @@ informative:
       org: "IETF MOQ WG"
     date: 2026
     seriesinfo:
-      Internet-Draft: draft-ietf-moq-transport-17
+      Internet-Draft: draft-ietf-moq-transport-23
     target: "https://datatracker.ietf.org/doc/draft-ietf-moq-transport/"
   MoQMetrics:
     title: "Metrics over MOQT"
@@ -57,7 +58,7 @@ informative:
       name: "C. Jennings"
     date: 2025
     seriesinfo:
-      Internet-Draft: draft-jennings-moq-metrics-02
+      Internet-Draft: draft-jennings-moq-metrics-03
     target: "https://datatracker.ietf.org/doc/draft-jennings-moq-metrics/"
   RFC8801:
   RFC8805:
@@ -138,7 +139,7 @@ Deployments commonly measure **RTT to Relay**, **PT (Propagation Time) to Relay*
 
 # Geocode Representation
 
-This section is informative. The following formats are suggested for representing relay geocode; implementations may use alternative representations.
+This section is informative. The identity option uses exactly one primary representation: WGS84 coordinates or an IATA code. Country and subdivision codes are separate jurisdiction claims.
 
 ## Suggested Format: WGS84 Coordinates
 
@@ -160,7 +161,7 @@ Example (JSON):
 
 ## Suggested: IATA Code
 
-An IATA airport code may be included as a human-readable geographic identifier (e.g., JFK for New York, LHR for London). It is advisory only and may correspond to the nearest major airport or metro area where the relay is located; precise routing may use latitude/longitude when geographic accuracy is required.
+An IATA airport code is a human-readable metro-area identifier (e.g., JFK for New York, LHR for London). It may correspond to a nearby airport rather than the relay's facility. It is not a substitute for country or subdivision when enforcing jurisdiction policy.
 
 # Integration with MoQ
 
@@ -213,32 +214,33 @@ To allow independent evolution and selective advertisement, identifiers and dyna
 
 ### GEOCODE_IDENTITY Setup Option
 
-This option carries stable geographic identifiers for the advertising relay. The option type is `GEOCODE_IDENTITY` (see {{iana-setup}}). The value is a length-prefixed UTF-8 JSON object with the following fields:
+Each endpoint sends a SETUP message at the beginning of a MOQT session. A relay that advertises this capability MUST include its own `GEOCODE_IDENTITY` Setup Option in its SETUP message. In a relay-to-relay session, each relay sends its own identity. The option describes only the sender; it does not advertise the complete route or other relays.
 
-- `relay_id` (string, REQUIRED): Unique relay identifier.
-- `latitude` / `longitude` (number, REQUIRED): WGS84 coordinates.
-- `altitude` (number, OPTIONAL): Meters above WGS84 ellipsoid.
-- `iata_code` (string, OPTIONAL): Three-letter IATA airport/metro code.
-- `country` (string, OPTIONAL): ISO 3166-1 alpha-2.
+The value is a JSON object encoded as UTF-8, without a byte order mark, as specified in {{RFC8259}}. It contains:
+
+- `relay_id` (string, REQUIRED): Stable identifier for the relay.
+- `geocode` (object, REQUIRED): Exactly one primary representation, either `{"type":"wgs84","latitude":40.6413,"longitude":-73.7781}` or `{"type":"iata","code":"JFK"}`.
+- `country` (string, OPTIONAL): ISO 3166-1 alpha-2 jurisdiction code.
 - `subdivision` (string, OPTIONAL): ISO 3166-2 subdivision code {{RFC9388}}.
+- `location_precision` (string, REQUIRED): `exact`, `coarse`, or `jurisdiction-only`.
+
+An IATA code identifies an airport or metro area and MUST NOT be used alone to enforce a jurisdiction boundary. An endpoint that requires jurisdiction enforcement uses the country or subdivision claim and its configured trust policy. A relay identity option is a claim by the sender, not independent proof of physical location.
 
 Example (informative):
 
 ```json
 {
-  "relay_id": "relay-D",
-  "latitude": 40.6413,
-  "longitude": -73.7781,
-  "altitude": 4,
-  "iata_code": "JFK",
+  "relay_id": "relay-d",
+  "geocode": { "type": "wgs84", "latitude": 40.7, "longitude": -74.0 },
   "country": "US",
-  "subdivision": "US-NY"
+  "subdivision": "US-NY",
+  "location_precision": "coarse"
 }
 ```
 
 ### GEOCODE_METRICS Setup Option
 
-This option carries dynamic path metrics for the advertising relay and for reachability to other relays. The option type is `GEOCODE_METRICS` (see {{iana-setup}}). The value is a length-prefixed UTF-8 JSON object with the following fields:
+This option carries dynamic path metrics for the advertising relay and for reachability to other relays. The option type is `GEOCODE_METRICS` (see {{iana-setup}}). The Setup Option uses MOQT Type-Length-Value framing. Its value is a UTF-8 JSON object with the following fields; it has no additional JSON-internal length prefix.
 
 - `rtt_ms` (number, OPTIONAL): RTT to this relay in milliseconds.
 - `pt_ms` (number, OPTIONAL): Propagation time to this relay in milliseconds.
