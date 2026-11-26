@@ -313,11 +313,9 @@ When relays advertise reachability (e.g., `reachable` with `rtt_ms`, `pt_ms`, `b
 
 - Adversaries could advertise false geocode to attract traffic or evade geographic restrictions. Relays SHOULD be authenticated; geocode from untrusted sources SHOULD be validated or ignored.
 
-# IANA Considerations
-{#iana}
+# IANA Considerations {#iana}
 
-## MOQT Setup Option Types
-{#iana-setup}
+## MOQT Setup Option Types {#iana-setup}
 
 This document requests registration of the following MOQT Setup Option types in the appropriate MOQT registry (see {{MoQTransport}}):
 
