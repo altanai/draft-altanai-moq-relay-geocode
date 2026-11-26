@@ -2,8 +2,7 @@
 
 *Related document for draft-altanai-moq-relay-geocode*
 
-This document defines the JSON schemas and examples for relay geocode
-identity, path metrics, and reachability. It is a supporting
+This document defines JSON examples for relay geocode identity, path metrics, and reachability. Networked JSON is encoded as UTF-8 without a byte order mark per RFC 8259; UTF-7 is not used. It is a supporting
 specification for [draft-altanai-moq-relay-geocode](https://datatracker.ietf.org/doc/draft-altanai-moq-relay-geocode/).
 
 Advertisements are intentionally split so that stable identifiers and
@@ -12,43 +11,37 @@ options: `GEOCODE_IDENTITY` and `GEOCODE_METRICS`).
 
 ---
 
-## Identity Schema (`GEOCODE_IDENTITY`)
+## Relay Identity (`GEOCODE_IDENTITY`)
 
-Stable geographic identifiers for a relay.
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "MoQ Relay Geocode Identity",
-  "type": "object",
-  "required": ["relay_id", "latitude", "longitude"],
-  "properties": {
-    "relay_id": { "type": "string", "description": "Unique relay identifier" },
-    "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
-    "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
-    "altitude": { "type": "number", "description": "Meters above WGS84 ellipsoid" },
-    "iata_code": { "type": "string", "pattern": "^[A-Z]{3}$", "description": "IATA airport/metro code" },
-    "country": { "type": "string", "pattern": "^[A-Z]{2}$", "description": "ISO 3166-1 alpha-2" },
-    "subdivision": { "type": "string", "description": "ISO 3166-2 subdivision" }
-  }
-}
-```
-
-### Example identity
+The `geocode` member contains exactly one primary representation: WGS84 or
+IATA. Country and subdivision are separate jurisdiction claims. IATA codes
+identify an airport or metro area and do not establish a jurisdiction.
 
 ```json
 {
-  "relay_id": "relay-D",
-  "latitude": 40.6413,
-  "longitude": -73.7781,
-  "altitude": 4,
-  "iata_code": "JFK",
+  "relay_id": "relay-d",
+  "geocode": {
+    "type": "wgs84",
+    "latitude": 40.7,
+    "longitude": -74.0
+  },
   "country": "US",
-  "subdivision": "US-NY"
+  "subdivision": "US-NY",
+  "location_precision": "coarse"
 }
 ```
 
----
+An IATA representation uses this form instead:
+
+```json
+{
+  "relay_id": "relay-d",
+  "geocode": { "type": "iata", "code": "JFK" },
+  "country": "US",
+  "subdivision": "US-NY",
+  "location_precision": "jurisdiction-only"
+}
+```
 
 ## Metrics Schema (`GEOCODE_METRICS`)
 
