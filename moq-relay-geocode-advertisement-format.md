@@ -125,3 +125,22 @@ relays, not a fixed neighbor list.
 | bw_kbps | No | Bandwidth estimate (kbps) |
 | loss | No | Loss ratio in range 0.0 to 1.0 |
 | reachable | No | Dynamic reachability to other relays with optional path metrics |
+
+
+## Client Policy Intent (`GEOCODE_INTENT`)
+
+The client can request allowed jurisdictions and/or a nearby relay without
+sending exact client coordinates:
+
+```json
+{
+  "allowed_jurisdictions": ["US", "US-NY"],
+  "near_me": true,
+  "desired_geocode": { "type": "iata", "code": "JFK" }
+}
+```
+
+This option expresses policy intent; it does not grant authorization or
+authenticate the client. The receiving relay applies its authorization and
+trust policy before selecting or redirecting to a relay.
+
