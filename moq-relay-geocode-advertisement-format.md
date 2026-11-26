@@ -50,57 +50,21 @@ Stable geographic identifiers for a relay.
 
 ---
 
-## Metrics Schema (`GEOCODE_METRICS`)
+## Dynamic Metrics Track
 
-Dynamic path metrics and reachability. Topology in MoQ deployments is
-dynamic; the `reachable` array describes current reachability to other
-relays, not a fixed neighbor list.
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "MoQ Relay Geocode Metrics",
-  "type": "object",
-  "properties": {
-    "rtt_ms": { "type": "number", "description": "RTT to this relay (ms)" },
-    "pt_ms": { "type": "number", "description": "Propagation time to relay (ms)" },
-    "bw_kbps": { "type": "number", "description": "Bandwidth estimate (kbps)" },
-    "loss": { "type": "number", "minimum": 0, "maximum": 1, "description": "Loss ratio 0.0-1.0" },
-    "reachable": {
-      "type": "array",
-      "description": "Currently reachable relays and path metrics (dynamic, not a fixed topology)",
-      "items": {
-        "type": "object",
-        "required": ["relay_id"],
-        "properties": {
-          "relay_id": { "type": "string" },
-          "rtt_ms": { "type": "number" },
-          "pt_ms": { "type": "number" },
-          "bw_kbps": { "type": "number" },
-          "loss": { "type": "number", "minimum": 0, "maximum": 1 }
-        }
-      }
-    }
-  }
-}
-```
-
-### Example metrics
+Each sample is timestamped and identifies the peer and measurement scope.
+SRTT is measured for an adjacent QUIC connection, not end-to-end latency.
 
 ```json
 {
-  "rtt_ms": 16,
-  "pt_ms": 12,
+  "sampled_at": "2026-11-25T20:00:00Z",
+  "peer_id": "relay-a",
+  "srtt_ms": 8.2,
+  "pt_ms": 5.1,
   "bw_kbps": 50000,
-  "loss": 0.001,
-  "reachable": [
-    { "relay_id": "relay-A", "rtt_ms": 7, "pt_ms": 3, "bw_kbps": 80000, "loss": 0.0 },
-    { "relay_id": "relay-C", "rtt_ms": 12, "pt_ms": 5, "bw_kbps": 40000, "loss": 0.002 }
-  ]
+  "loss": 0.001
 }
 ```
-
----
 
 ## Field Reference
 
@@ -116,7 +80,7 @@ relays, not a fixed neighbor list.
 | country | No | ISO 3166-1 alpha-2 |
 | subdivision | No | ISO 3166-2 subdivision |
 
-### Metrics fields
+### Dynamic metrics fields
 
 | Field | Required | Description |
 |-------|----------|-------------|
@@ -125,3 +89,58 @@ relays, not a fixed neighbor list.
 | bw_kbps | No | Bandwidth estimate (kbps) |
 | loss | No | Loss ratio in range 0.0 to 1.0 |
 | reachable | No | Dynamic reachability to other relays with optional path metrics |
+
+
+## Dynamic Metrics Track
+
+Each sample is timestamped and identifies its peer and measurement scope.
+SRTT values are per adjacent QUIC connection; they are not end-to-end latency.
+
+```json
+{
+  "sampled_at": "2026-11-25T20:00:00Z",
+  "peer_id": "relay-a",
+  "srtt_ms": 8.2,
+  "pt_ms": 5.1,
+  "bw_kbps": 50000,
+  "loss": 0.001
+}
+```
+
+## Hop-by-Hop Path Event (`path-events` track)
+
+Each event correlates a relay forwarding action to the MOQT Object and records
+the relay's ingress and egress peers. The byte count is the serialized MOQT
+Object length, including its header, properties, and payload, but excluding
+QUIC framing. `connection_object_bytes_received_total` is a monotonic counter
+for that ingress connection and uses `counter_epoch` to distinguish resets.
+
+```json
+{
+  "version": 1,
+  "object": {
+    "namespace": ["example", "media"],
+    "track": "video",
+    "group_id": 12,
+    "object_id": 7
+  },
+  "relay_id": "relay-d",
+  "ingress_peer": "publisher-edge",
+  "egress_peer": "relay-a",
+  "direction": "publisher-to-subscriber",
+  "geocode": { "type": "iata", "code": "JFK" },
+  "observed_at": "2026-11-25T20:00:00Z",
+  "ingress_srtt_ms": 16.4,
+  "egress_srtt_ms": 8.2,
+  "object_bytes_received": 1200,
+  "connection_object_bytes_received_total": 987654321,
+  "counter_epoch": "connection-7"
+}
+```
+
+An event reports the relay's forwarding action. It does not prove that the
+egress peer received the Object or independently prove the relay's location.
+The relay can publish one event per downstream forwarding action when an
+Object is replicated to multiple peers.
+
+Networked JSON is UTF-8 without a byte order mark per RFC 8259; UTF-7 is not used.
