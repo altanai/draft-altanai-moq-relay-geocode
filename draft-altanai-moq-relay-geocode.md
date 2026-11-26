@@ -41,6 +41,7 @@ author:
 
 normative:
   RFC7946:
+  RFC8259:
 
 informative:
   MoQTransport:
@@ -49,7 +50,7 @@ informative:
       org: "IETF MOQ WG"
     date: 2026
     seriesinfo:
-      Internet-Draft: draft-ietf-moq-transport-17
+      Internet-Draft: draft-ietf-moq-transport-23
     target: "https://datatracker.ietf.org/doc/draft-ietf-moq-transport/"
   MoQMetrics:
     title: "Metrics over MOQT"
@@ -57,7 +58,7 @@ informative:
       name: "C. Jennings"
     date: 2025
     seriesinfo:
-      Internet-Draft: draft-jennings-moq-metrics-02
+      Internet-Draft: draft-jennings-moq-metrics-03
     target: "https://datatracker.ietf.org/doc/draft-jennings-moq-metrics/"
   RFC8801:
   RFC8805:
@@ -124,6 +125,12 @@ Some clients require their media data to remain locally or geo-fenced within spe
 - Path selection avoids certain regions for policy or cost reasons.
 
 Geocode enables GDOR by allowing relays to advertise their jurisdiction (e.g., via country/region codes) and by allowing path computation to respect geographic boundaries. Service providers can use relay geocode and advertised reachability to other relays to **track the geographic path** of media packets as they traverse the MoQ relay mesh, supporting compliance audits and geo-fencing enforcement.
+
+## Sovereign Delivery and Client-Directed Geofencing
+
+A client or service can require a media flow to use only relays in an allowed jurisdiction set. A client can state its policy intent when establishing a session, such as an allowed country or subdivision and whether it prefers a relay near its network attachment. The client does not need to disclose precise coordinates to request a nearby relay. Each relay advertises its own geocode in SETUP; a routing controller or relay uses authenticated relay identities and hop-by-hop path events to evaluate the selected route. If the current relay cannot satisfy the policy, it directs the client to an eligible relay using session migration or request redirection. If no trusted route satisfies a strict policy, the request fails closed.
+
+The advertised geocode is an operator claim. This mechanism provides location and forwarding evidence for policy evaluation; it does not independently prove physical location or regulatory compliance.
 
 ## Path and Vicinity Awareness
 
@@ -213,7 +220,7 @@ To allow independent evolution and selective advertisement, identifiers and dyna
 
 ### GEOCODE_IDENTITY Setup Option
 
-This option carries stable geographic identifiers for the advertising relay. The option type is `GEOCODE_IDENTITY` (see {{iana-setup}}). The value is a length-prefixed UTF-8 JSON object with the following fields:
+This option carries stable geographic identifiers for the advertising relay. The option type is `GEOCODE_IDENTITY` (see {{iana-setup}}). The Setup Option uses MOQT Type-Length-Value framing. Its value is a UTF-8 JSON object with the following fields; it has no additional JSON-internal length prefix.
 
 - `relay_id` (string, REQUIRED): Unique relay identifier.
 - `latitude` / `longitude` (number, REQUIRED): WGS84 coordinates.
@@ -238,7 +245,7 @@ Example (informative):
 
 ### GEOCODE_METRICS Setup Option
 
-This option carries dynamic path metrics for the advertising relay and for reachability to other relays. The option type is `GEOCODE_METRICS` (see {{iana-setup}}). The value is a length-prefixed UTF-8 JSON object with the following fields:
+This option carries dynamic path metrics for the advertising relay and for reachability to other relays. The option type is `GEOCODE_METRICS` (see {{iana-setup}}). The Setup Option uses MOQT Type-Length-Value framing. Its value is a UTF-8 JSON object with the following fields; it has no additional JSON-internal length prefix.
 
 - `rtt_ms` (number, OPTIONAL): RTT to this relay in milliseconds.
 - `pt_ms` (number, OPTIONAL): Propagation time to this relay in milliseconds.
@@ -267,6 +274,19 @@ Example (informative):
 ```
 
 A relay MAY send `GEOCODE_IDENTITY` without `GEOCODE_METRICS`, or update metrics more frequently than identity (e.g., by re-sending SETUP options where the deployment allows, or by publishing updated metrics via Option 2 or Option 4). Additional Setup options MAY be defined later for further metric classes without changing `GEOCODE_IDENTITY`.
+
+### GEOCODE_INTENT Setup Option
+
+
+A client can include a `GEOCODE_INTENT` Setup Option to state its route policy. The Setup Option value is a UTF-8 JSON object, carried in the option's Type-Length-Value framing, containing one or more of:
+
+- `allowed_jurisdictions` (array of strings, OPTIONAL): ISO 3166-1 alpha-2 country codes or ISO 3166-2 subdivision codes.
+- `near_me` (boolean, OPTIONAL): Requests a relay near the client's current network attachment. This flag does not convey client coordinates or assert a precise client location.
+- `desired_geocode` (object, OPTIONAL): One WGS84 or IATA target using the same tagged representation as `GEOCODE_IDENTITY`.
+
+The receiving relay MUST authenticate and authorize the request before applying it. A relay MUST NOT treat the intent as authorization to disclose relay or client location information. A relay that cannot satisfy a strict jurisdiction policy MUST NOT serve the affected request through a route that contains an unknown or disallowed relay.
+
+If the client must move to another relay, the server can use a control-stream GOAWAY with a new session URI to migrate the session. A receiver can use a request-stream GOAWAY to migrate one request, or reject it with REQUEST_ERROR carrying the REDIRECT code and redirect target. The requester then establishes or uses the specified session and reissues the request. These mechanisms do not define route selection or policy; this document defines the geocode policy inputs used by the relay or controller.
 
 ### Other Discovery Mechanisms
 
@@ -325,6 +345,7 @@ This document requests registration of the following MOQT Setup Option types in 
 |------|-------|-------------|-----------|
 | GEOCODE_IDENTITY | TBD1 | Relay geographic identity (stable identifiers) | This document |
 | GEOCODE_METRICS | TBD2 | Relay path metrics and reachability | This document |
+| GEOCODE_INTENT | TBD3 | Client jurisdiction and proximity intent | This document |
 
 Until values are assigned, experimental use MUST use privately negotiated option types.
 
