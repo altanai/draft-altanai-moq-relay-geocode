@@ -89,7 +89,7 @@ Today, MoQ provides no standard way for relays to advertise geographic position.
 
 ## Design Goals
 
-- **Path trace in-band (primary)**: Use MOQT extension headers on objects for path tracing as the RECOMMENDED integration. Each relay/proxy appends device name and direction; clients can verify the geographic path from received objects.
+- **Path events on a dedicated track**: Publish immutable per-hop path events on a MOQT track. Forwarded Objects, Object Properties, payloads, and transport extension headers remain unchanged.
 - **Protocol alignment**: Use existing MOQT messages (PUBLISH, SUBSCRIBE) and streams for geocode advertisement, avoiding new message formats. Relays do not need to invent proprietary messaging for cross-vendor use cases.
 - **Minimal protocol impact**: Reuse existing MoQ catalog, metrics, or discovery mechanisms where possible.
 - **Interoperability**: Use standard geographic representations (WGS84, GeoJSON) and widely recognized identifiers (IATA codes).
@@ -237,9 +237,7 @@ Geocode MAY be part of metrics exposed per {{MoQMetrics}} for relay selection an
 
 ## Option 5: Discovery via MOQT SETUP Options (RECOMMENDED for session discovery)
 
-Discovery of relay identity and path metrics is expected to normalize on MOQT SETUP options (see {{MoQTransport}}). Relays that support geocode advertisement SHOULD include the Setup options defined in this section in SETUP. Endpoints MUST ignore unknown Setup options, enabling incremental deployment.
-
-To allow independent evolution and selective advertisement, identifiers and dynamic metric values are carried in **separate** Setup options rather than a single combined blob.
+A relay advertises stable identity in a MOQT SETUP option (see {{MoQTransport}}). Dynamic metrics and path events use the `metrics` and `path-events` tracks defined above; they are not sent in SETUP. Endpoints MUST ignore unknown Setup Options, enabling incremental deployment. The proposed Setup Option code point requires IANA allocation; until assigned, implementations use privately negotiated values.
 
 ### GEOCODE_IDENTITY Setup Option
 
@@ -277,7 +275,7 @@ As alternatives or complements to SETUP options, a relay MAY also:
 - Serve geocode at a well-known path (e.g., `/.well-known/moq-relay-geocode`).
 - Advertise geocode as provisioning-domain data per {{RFC8801}}.
 
-The reserved namespace for Option 2, the path-trace extension header type for Option 1, and exact binary encodings for SETUP option values (if not JSON) are left to a companion specification or a future revision of {{MoQTransport}}. Until code points are assigned, experimental deployments MUST use privately negotiated option types.
+The relay Track Namespace and Setup Option code point are proposals that require IANA allocation or private negotiation for experiments. The track names and JSON schemas in this document do not define new MOQT control messages or modify Object encoding.
 
 # Vicinity and Path Computation
 
@@ -287,7 +285,7 @@ Given two relays with geocode (lat1, lon1) and (lat2, lon2), the approximate gre
 
 ## Path Metrics
 
-When relays advertise reachability (e.g., `reachable` with `rtt_ms`, `pt_ms`, `bw_kbps`, and `loss` per Appendix C or the `GEOCODE_METRICS` Setup option), a client or orchestration system can:
+When relays publish reachability (e.g., `reachable` with `rtt_ms`, `pt_ms`, `bw_kbps`, and `loss` on the `metrics` track), a client or orchestration system can:
 
 1. **Build a relay graph**: Nodes = relays, edges = current reachability relationships with RTT/PT/bandwidth/loss.
 2. **Compute paths**: Shortest or best path by RTT, PT, bandwidth, loss, or geographic distance.
